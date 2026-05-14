@@ -1,0 +1,118 @@
+---
+title: AI Agent 节点初识 · 一眼看到智能体的样子
+description: 为第 5 部分铺垫 —— AI Agent 节点的输入输出长什么样、和普通节点有啥不一样
+sidebar:
+  order: 7
+  label: 2.6 AI Agent 初识
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 2 章 · 第 6 节</span>
+
+n8n 1.x 之后，AI Agent 成了节点库里的"明星"。本节是**提前一瞥**——让你在第 5 部分深入之前，对 AI Agent 节点的样子和心智模型有个直觉。
+
+## AI Agent 是什么
+
+普通节点是"输入 → 固定处理 → 输出"。
+
+AI Agent 节点是"输入 → **让 LLM 自己决定怎么处理**（可能调工具）→ 输出"。
+
+<TerminalCell filename="agent-vs-normal.txt" runTag="🤖">
+{`普通节点（HTTP Request）：
+  Input:  { url: "..." }
+  Logic:  发请求、拿响应
+  Output: 响应体
+
+AI Agent 节点：
+  Input:    { input: "查一下 Linus 的 GitHub 仓库数" }
+  Logic:    LLM 看到这句话 → 推理 → 决定调用"HTTP Request 工具" → 拿到数据 → 整理回答
+  Output:   "Linus Torvalds 有 7 个公开仓库..."`}
+</TerminalCell>
+
+**LLM 是大脑，工具是手脚**——这就是"Agent"模式的核心。
+
+## AI Agent 节点的画布外观
+
+跟普通节点不同，AI Agent 节点有**多个连接口**：
+
+<TerminalCell filename="agent-canvas.txt" runTag="📊">
+{`        ┌─────────────────────┐
+入口数据 ─▶│      AI Agent       │─▶ 输出
+        │                     │
+        │  Chat Model         │ ◀── 选 LLM（OpenAI/Claude/Ollama）
+        │  Memory             │ ◀── 选记忆模块（可选）
+        │  Tool (1)           │ ◀── 工具 1（HTTP / Code / Wikipedia 等）
+        │  Tool (2)           │ ◀── 工具 2
+        │  ...                │
+        └─────────────────────┘`}
+</TerminalCell>
+
+每个下方接口对应一个**子节点**——这是 n8n 在 AI Agent 上引入的新范式："**主节点 + 一堆挂载件**"。
+
+## 一个 5 节点的最小 Agent 例子
+
+<TerminalCell filename="minimal-agent.txt" runTag="🎯">
+{`组件清单：
+  1. Chat Trigger        ← 用户聊天入口
+  2. AI Agent           ← 主体
+     ├─ Chat Model: OpenAI GPT-4o
+     ├─ Memory: Window Buffer Memory
+     └─ Tool: HTTP Request Tool
+                       
+对话示例：
+  用户："给我今天上海的天气"
+  Agent 思考：需要调用天气 API
+  Agent 调用 HTTP Tool → GET api.weather.com/shanghai
+  Tool 返回：22°C, 多云
+  Agent 整理回答："上海今天 22 度，多云"`}
+</TerminalCell>
+
+只用 5 个节点，你就有一个能上网查实时数据的 AI 助手。完整实现第 5 部分会讲。
+
+## AI Agent 跟普通节点的 3 大不同
+
+| 维度 | 普通节点 | AI Agent |
+|---|---|---|
+| **逻辑** | 你写死 | LLM 自己决定 |
+| **画布** | 一个进、一个出 | 一个进、一个出 + N 个挂载件 |
+| **运行时长** | 通常毫秒级 | 几秒到几十秒（LLM 推理慢） |
+| **可预测性** | 完全可预测 | 受 LLM 输出影响，有随机性 |
+| **成本** | 0（除非外部 API 收费） | 按 token 计费（OpenAI/Claude 都是 $/M tokens） |
+
+## 什么时候**不该**用 AI Agent
+
+读者最容易掉的坑：**把所有自动化都套个 Agent**。这通常是坏主意。
+
+<TerminalCell filename="when-not-to-use.txt" runTag="⚠">
+{`❌ 不该用 AI Agent 的场景：
+  • 简单的"事件 → 通知" workflow（用普通节点更便宜更快）
+  • 严格要求确定性输出的场景（如金额计算、订单状态变更）
+  • 数据格式高度结构化、规则清晰（用 IF / Switch / Set 即可）
+
+✅ 该用 AI Agent 的场景：
+  • 输入是自然语言（用户提问、邮件正文、客服聊天）
+  • 需要"判断 + 调用合适工具"的混合任务
+  • 总结、提炼、改写、翻译这类语言任务
+  • RAG（基于自有文档回答问题）`}
+</TerminalCell>
+
+<TipCallout type="warn" title="新手提示 · 不要心急">
+  本节只是让你**认识** AI Agent 长什么样。**先把 Part 3 和 Part 4 学完**——表达式和流程控制是任何 Agent workflow 的基础，跳过去看 Agent 会一头雾水。
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  打开你的 n8n，搜索 "AI Agent" 拖一个到画布上。**先别配它**——只观察它在画布上长啥样、有哪些挂载口、点开 Chat Model 选项里有哪些可用 LLM。建立直觉。
+</TipCallout>
+
+## 本节要点回顾
+
+- AI Agent = LLM 做大脑 + 工具做手脚的混合节点
+- 画布上有**多个挂载口**：Chat Model / Memory / Tools
+- 跟普通节点的 3 大不同：可预测性、运行时长、成本
+- 自然语言输入 + 混合任务最适合用 Agent
+- 简单确定性任务**别**套 Agent
+- 第 5 部分会深入讲，先学完 Part 3-4
+
+至此你已学完 **第 2 部分**。下一部分进入 [Part 3 · 表达式与数据](../../03-expressions/overview/)。

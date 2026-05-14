@@ -1,0 +1,118 @@
+---
+title: AI Agent Node · A Sneak Peek
+description: Setup for Part 5 — what the AI Agent node looks like and how it differs from regular nodes
+sidebar:
+  order: 7
+  label: 2.6 AI Agent Primer
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 2 · Section 6</span>
+
+Since n8n 1.x, AI Agent is the rising star of the node library. This section is a **preview** — so by the time Part 5 dives in, you've already met the node and know its silhouette.
+
+## What is an AI Agent?
+
+A regular node: "input → fixed logic → output."
+
+An AI Agent node: "input → **LLM decides how to process** (possibly calling tools) → output."
+
+<TerminalCell filename="agent-vs-normal.txt" runTag="🤖">
+{`Regular node (HTTP Request):
+  Input:  { url: "..." }
+  Logic:  send request, return response
+  Output: response body
+
+AI Agent:
+  Input:    { input: "Look up Linus's GitHub repo count" }
+  Logic:    LLM reads → reasons → invokes "HTTP Request tool" → fetches data → answers
+  Output:   "Linus Torvalds has 7 public repos..."`}
+</TerminalCell>
+
+**LLM is the brain, tools are the hands.** That's the Agent paradigm.
+
+## Canvas appearance
+
+AI Agent has **multiple connection ports**, unlike regular nodes:
+
+<TerminalCell filename="agent-canvas.txt" runTag="📊">
+{`        ┌─────────────────────┐
+   in ─▶│      AI Agent       │─▶ out
+        │                     │
+        │  Chat Model         │ ◀── pick LLM (OpenAI / Claude / Ollama)
+        │  Memory             │ ◀── memory module (optional)
+        │  Tool (1)           │ ◀── tool 1 (HTTP / Code / Wikipedia / …)
+        │  Tool (2)           │ ◀── tool 2
+        │  ...                │
+        └─────────────────────┘`}
+</TerminalCell>
+
+Each lower port hosts a **sub-node**. This is n8n's new "main node + attached parts" paradigm for AI workflows.
+
+## A minimal 5-node agent
+
+<TerminalCell filename="minimal-agent.txt" runTag="🎯">
+{`Parts list:
+  1. Chat Trigger        ← user chat entry
+  2. AI Agent           ← main
+     ├─ Chat Model: OpenAI GPT-4o
+     ├─ Memory: Window Buffer Memory
+     └─ Tool: HTTP Request Tool
+
+Conversation:
+  User: "What's the weather in Shanghai today?"
+  Agent reasons: needs weather API
+  Agent calls HTTP Tool → GET api.weather.com/shanghai
+  Tool returns: 22°C, cloudy
+  Agent composes reply: "Shanghai is 22°C and cloudy today"`}
+</TerminalCell>
+
+Five nodes, and you have an AI assistant that can fetch real-time data. Part 5 builds this end-to-end.
+
+## Three differences from regular nodes
+
+| Aspect | Regular | AI Agent |
+|---|---|---|
+| **Logic** | You write it | LLM decides |
+| **Canvas** | 1 in, 1 out | 1 in, 1 out + N attachments |
+| **Latency** | Milliseconds | Seconds to tens of seconds |
+| **Determinism** | Fully predictable | Stochastic |
+| **Cost** | 0 (unless API fees) | Token-priced ($/M tokens) |
+
+## When NOT to use AI Agent
+
+The most common mistake: **wrap an Agent around every automation**. Usually a bad idea.
+
+<TerminalCell filename="when-not-to-use.txt" runTag="⚠">
+{`❌ Bad fit for AI Agent:
+  • Simple "event → notify" workflows (regular nodes are cheaper and faster)
+  • Strict determinism required (money math, order state)
+  • Highly structured data with clear rules (use IF / Switch / Set)
+
+✅ Good fit for AI Agent:
+  • Input is natural language (chat, email body, support tickets)
+  • Tasks combine "judgment + appropriate tool call"
+  • Summary / extraction / rewriting / translation
+  • RAG (answer from your own documents)`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Don't rush">
+  This is just a **glance**. Finish Parts 3 and 4 first — expressions and flow logic are foundational for any agent workflow.
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Drag an "AI Agent" node onto your canvas. **Don't configure it yet** — just look. Inspect its attachment ports and which LLMs are available under Chat Model. Build intuition.
+</TipCallout>
+
+## Section recap
+
+- AI Agent = LLM brain + tool hands
+- Multiple ports on canvas: Chat Model / Memory / Tools
+- Three differences: determinism, latency, cost
+- Sweet spot: natural language input + mixed tasks
+- **Don't** wrap simple deterministic flows in agents
+- Part 5 builds them; finish Parts 3-4 first
+
+End of **Part 2**. On to [Part 3 · Expressions & Data](../../03-expressions/overview/).

@@ -1,0 +1,114 @@
+---
+title: App Nodes · 450+ Integrations
+description: Most SaaS tools have built-in nodes — know the categories, find the node, and know when to fall back to HTTP Request
+sidebar:
+  order: 5
+  label: 2.4 App Nodes
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 2 · Section 4</span>
+
+n8n ships **450+ app nodes** — Slack, Notion, OpenAI, Shopify, you name it. These "ready-made" nodes are what makes n8n more pleasant than rolling your own HTTP calls. This section gives you the lay of the land — so that **the moment you have a need, you know which node to grab**.
+
+## Tour by category
+
+### 💬 Communication & collaboration
+**Slack · Discord · Telegram · MS Teams · Mattermost · Email · Gmail** — send/receive messages, upload files, manage channels.
+
+### 📋 Task & project tools
+**Notion · Airtable · Trello · ClickUp · Asana · Linear · Jira** — DB-row CRUD, create tasks, status updates.
+
+### 🛒 Commerce & payments
+**Shopify · Stripe · PayPal · WooCommerce · Square** — order events, refunds, inventory.
+
+### ☁️ Cloud storage & files
+**Google Drive · Dropbox · OneDrive · AWS S3 · FTP / SFTP** — upload/download/move, list, metadata.
+
+### 📊 Databases
+**Postgres · MySQL · MongoDB · Redis · Supabase · Snowflake · BigQuery** — run SQL, CRUD, bulk insert.
+
+### 📧 Email marketing & CRM
+**HubSpot · Salesforce · Mailchimp · ActiveCampaign · Pipedrive · Intercom**
+
+### 🤖 AI / LLM (fastest-growing)
+**OpenAI · Anthropic · Hugging Face · Ollama · Cohere · ElevenLabs · LangChain group** — covered in Part 5.
+
+### 🛠 Developer tools
+**GitHub · GitLab · Bitbucket · Jenkins · GraphQL · MQTT · WebSocket**
+
+### 🌐 Content platforms
+**WordPress · Webflow · Ghost · YouTube · Twitter/X · Reddit · Bluesky**
+
+## App node vs HTTP Request: which?
+
+| | App Node | HTTP Request |
+|---|---|---|
+| **Speed to build** | Fast (form UI) | Slow (read docs) |
+| **Coverage** | Common APIs | **Every** API |
+| **New feature lag** | Wait for n8n update | Use immediately |
+| **Auth** | Configure once | Per-workflow |
+
+**Heuristic:** **prefer the app node; fall back to HTTP Request when the node doesn't cover what you need.**
+
+<TerminalCell filename="when-to-fallback.txt" runTag="🎯">
+{`A · "Send a Slack message to #general"
+  → Slack node (one line of config)
+
+B · "Use Slack's advanced Block Kit UI elements not exposed by the Slack node"
+  → HTTP Request to chat.postMessage with custom blocks
+
+C · "Talk to an obscure tool with no n8n node"
+  → HTTP Request all the way`}
+</TerminalCell>
+
+## Resource × Operation: the 2D selector
+
+Every app node has two top-level dropdowns:
+
+- **Resource** — kind of object (Notion: `database / page / block`)
+- **Operation** — what to do with it (`get / create / update / delete / list / search`)
+
+<TerminalCell filename="notion-resource-operation.txt" runTag="📦">
+{`Notion's Resource × Operation matrix:
+
+Resource: Database
+  Operations: get, getMany, getDatabasePages, search
+
+Resource: Page
+  Operations: get, getMany, create, update, archive
+
+Resource: Block
+  Operations: getMany, append, update, delete
+
+Resource: User
+  Operations: get, getMany`}
+</TerminalCell>
+
+This Resource × Operation pattern repeats across 50+ app nodes — **learn one, learn a family**.
+
+<TipCallout type="warn" title="Top trap: permission errors">
+  90% of the time the cause is misconfigured **Credentials** — OAuth scope insufficient, API key missing permissions. Next section covers it.
+</TipCallout>
+
+## Can't find a node?
+
+1. **Refine search** — n8n's search is loose; try synonyms
+2. **Use HTTP Request** — fallback always works
+3. **Community nodes** — self-host can install 300+ community-built nodes from npm (`n8n-nodes-*`)
+4. **Custom nodes** — last resort; out of scope for this book
+
+<TipCallout type="quest" title="Extension challenge">
+  Pick a SaaS app you use daily. Open its n8n node, list its Resource × Operation combos. Compare against the app's official API docs — what % is covered?
+</TipCallout>
+
+## Section recap
+
+- 450+ app nodes, organized by domain
+- Prefer app nodes (speed); fall back to HTTP Request (coverage)
+- The core pattern: **Resource × Operation**
+- 90% of node errors are credential issues
+
+Next: fix that 90% — [Credentials](../credentials/).

@@ -1,0 +1,114 @@
+---
+title: Trigger Overview · Schedule / Webhook / Events / Sub-workflow
+description: The trigger decides when your workflow starts — pick the right one and you're halfway done
+sidebar:
+  order: 2
+  label: 2.1 Triggers
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 2 · Section 1</span>
+
+Every workflow needs a starting point — a Trigger. **Pick the right one and you're halfway done.** This section sweeps through the five common trigger types.
+
+## The five-choice menu
+
+| Trigger | Fires when | Typical use |
+|---|---|---|
+| **Manual Trigger** | You click the button | Debug, one-off |
+| **Schedule (Cron)** | On a schedule | Daily 9am pull, every-5-min poll |
+| **Webhook** | HTTP request arrives | Forms, callbacks, chatbots |
+| **App Event** | App emits an event | New GitHub Issue, new Stripe payment |
+| **Execute Sub-workflow** | Another workflow calls | Modular reuse |
+
+## 1 · Manual Trigger
+
+Simplest. Press "Test workflow" → it runs.
+
+**Use for:** debug and one-shots.  
+**Not for:** production — even with Active flipped on, manual won't auto-fire.
+
+## 2 · Schedule (Cron)
+
+Periodic.
+
+<TerminalCell filename="schedule-modes.txt" runTag="⏰">
+{`Mode 1 · Interval
+  Every N seconds / minutes / hours / days / weeks / months
+  e.g. every 30 minutes
+
+Mode 2 · Cron expression (advanced)
+  Standard cron:  0 9 * * 1-5
+  → Mon-Fri at 09:00`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Timezone trap">
+  Schedule uses the n8n instance's timezone. Cloud defaults to UTC. To run "9am Asia/Shanghai", either set `GENERIC_TIMEZONE` env (self-host) or use UTC time in cron (`0 1 * * *` = 9am Shanghai).
+</TipCallout>
+
+## 3 · Webhook
+
+Listens at an HTTP endpoint. External requests start the flow.
+
+<TerminalCell filename="webhook-flow.txt" runTag="🪝">
+{`Two URLs per node:
+  - Test URL:        ../webhook-test/abc-123-xyz  (only during "Listen for test event")
+  - Production URL:  ../webhook/abc-123-xyz        (only when workflow is Active)
+
+External POST → triggers workflow.
+Output = the HTTP request (headers / body / query).`}
+</TerminalCell>
+
+**Use for:** third-party callbacks (Stripe / GitHub / Typeform), chatbot entry, form submissions.
+
+## 4 · App Event Triggers
+
+n8n bundles event triggers for 60+ apps — easier than Webhook because n8n handles "how to subscribe to that app's events."
+
+Examples:
+- **GitHub Trigger** — new Issue / PR / Star
+- **Stripe Trigger** — payment succeeded / subscription canceled
+- **Gmail Trigger** — new email (filterable)
+- **Slack / Airtable / Notion / Sheets Triggers** — change events
+
+<TipCallout type="tip" title="They're often webhooks underneath">
+  Most App Event Triggers register a webhook with the target app on your behalf when activated. So they still require valid Credentials configured upfront.
+</TipCallout>
+
+## 5 · Execute Sub-workflow Trigger
+
+Lets another workflow call this one. **For modularization.**
+
+<TerminalCell filename="sub-workflow.txt" runTag="🔗">
+{`Main workflow A:
+  ... → Execute Workflow(→ B) → ...
+
+Sub-workflow B:
+  [Execute Sub-workflow Trigger]  ← input arrives here
+    → send email
+    → log
+    → return result`}
+</TerminalCell>
+
+Part 4 dives into sub-workflow patterns.
+
+## A workflow can have multiple triggers
+
+Drop several trigger nodes on the same canvas — **any** of them firing starts the workflow.
+
+E.g. a "notify Slack" workflow can run on a schedule (every hour), be invoked manually, AND respond to webhook calls — all at once.
+
+<TipCallout type="quest" title="Extension challenge">
+  Build a workflow with both Schedule (hourly) and Webhook triggers. Use `{`$execution.mode`}` to detect which one fired and tag the output accordingly.
+</TipCallout>
+
+## Section recap
+
+- Five trigger types: Manual / Schedule / Webhook / App Event / Sub-workflow
+- Schedule → mind the timezone; Webhook → mind Test vs Production URL
+- App Triggers are often webhooks under the hood (still need credentials)
+- One workflow, **multiple triggers** is fine
+
+Next: the universal node — [HTTP Request](../http-request/).

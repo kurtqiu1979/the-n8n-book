@@ -1,0 +1,126 @@
+---
+title: 触发器全景 · Schedule / Webhook / 事件 / Sub-workflow
+description: 触发器决定 workflow 何时启动 —— 选对了事半功倍
+sidebar:
+  order: 2
+  label: 2.1 触发器全景
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 2 章 · 第 1 节</span>
+
+每个 workflow 必须有一个起点——触发器（Trigger）。**选对触发器，工作流就成功一半**。这一节扫一遍 n8n 5 类常用触发器，告诉你各自适合什么场景。
+
+## 触发器 5 选 1
+
+| 触发器 | 何时启动 | 典型场景 |
+|---|---|---|
+| **Manual Trigger** | 你手动按按钮 | 调试、一次性任务 |
+| **Schedule (Cron)** | 按时间表自动 | 每天 9:00 拉数据、每 5 分钟轮询 |
+| **Webhook** | 外部 HTTP 请求到达 | 表单提交、第三方回调、聊天机器人 |
+| **App Event** | 应用事件发生 | 新 GitHub Issue、新 Stripe 支付、Gmail 收信 |
+| **Execute Sub-workflow** | 被另一个 workflow 调用 | 模块化复用、共享逻辑 |
+
+## 1 · Manual Trigger
+
+最简单的触发器——你在编辑器里按 "Test workflow" 按钮，它启动。
+
+**适合：** 开发、调试、临时跑一次性任务。
+
+**不适合：** 生产环境后台自动运行——它**不能**通过 Active 开关自动跑。
+
+## 2 · Schedule Trigger（Cron）
+
+按时间表周期性自动触发。
+
+<TerminalCell filename="schedule-modes.txt" runTag="⏰">
+{`配置方式 1 · 间隔（Interval）
+  每 N 秒 / 分 / 小时 / 天 / 周 / 月运行一次
+  例：每 30 分钟运行 → Every 30 Minutes
+
+配置方式 2 · Cron 表达式（高级）
+  支持标准 cron：  0 9 * * 1-5
+  含义：周一到周五，每天上午 9:00`}
+</TerminalCell>
+
+<TipCallout type="warn" title="时区陷阱">
+  Schedule 触发器使用 n8n 实例的时区。Cloud 默认 UTC。如果你想"北京时间每天 9:00"跑，要么改 n8n 的 `GENERIC_TIMEZONE` 环境变量（自托管），要么把 cron 改为 UTC 时间（`0 1 * * *` = 北京 9:00）。
+</TipCallout>
+
+## 3 · Webhook Trigger
+
+监听一个 HTTP 端点，**外部请求到达时启动**。这是连接外部世界的主要桥梁。
+
+<TerminalCell filename="webhook-flow.txt" runTag="🪝">
+{`1. 节点配好后，n8n 会生成两个 URL：
+   - Test URL：    .../webhook-test/abc-123-xyz （仅"Listen for test event"时生效）
+   - Production：  .../webhook/abc-123-xyz （workflow 处于 Active 时生效）
+
+2. 外部系统 POST 到 Production URL → 触发 workflow
+
+3. Webhook 节点输出 = 收到的 HTTP 请求（headers / body / query）
+   可以从中拿数据继续处理`}
+</TerminalCell>
+
+**适合：** 第三方系统回调（Stripe / GitHub / Typeform）、聊天机器人入口、表单提交。
+
+## 4 · App Event Trigger（应用事件触发器）
+
+n8n 内置了 60+ 应用的事件触发器，比 Webhook 更省事——n8n 替你配好了"如何监听该应用的事件"。
+
+常见例子：
+- **GitHub Trigger** —— 新 Issue / 新 PR / 新 Star
+- **Stripe Trigger** —— 支付成功 / 订阅取消 / 退款
+- **Gmail Trigger** —— 收到新邮件（带标签筛选）
+- **Slack Trigger** —— 收到提及 / 新消息
+- **Airtable / Notion / Google Sheets Trigger** —— 行/页变更
+
+**适合：** 你直接消费这些主流 SaaS 应用的事件，不用自己配 Webhook。
+
+<TipCallout type="tip" title="App Trigger 的本质">
+  App Event Trigger **底层多数也是 Webhook**——只是 n8n 替你向那个应用注册了 Webhook。Activate 时 n8n 调用应用 API 注册，Deactivate 时取消注册。所以它要求你提前配好该应用的 Credentials。
+</TipCallout>
+
+## 5 · Execute Sub-workflow Trigger
+
+让另一个 workflow 调用自己。**用于模块化和复用**——比如"发邮件 + 写日志"这个逻辑很多 workflow 都需要，抽成 sub-workflow，主 workflow 调用它。
+
+<TerminalCell filename="sub-workflow.txt" runTag="🔗">
+{`主 workflow A:
+  ... → Execute Workflow（指向 B）→ ...
+
+子 workflow B:
+  [Execute Sub-workflow Trigger]  ← 入参从这里来
+    → 发邮件
+    → 写日志
+    → 输出处理结果`}
+</TerminalCell>
+
+第 4 部分会专门讲 Sub-workflow 的设计模式。
+
+## 一个 workflow 可以有几个触发器？
+
+**多个**。这是 n8n 比传统自动化工具更强的地方——同一个 workflow 可以被**多种方式**触发。
+
+比如一个"通知 Slack"的 workflow，可以同时：
+- 每天 9:00 自动跑（Schedule）
+- 被 PM 手动触发临时跑（Manual）
+- 被外部系统调用（Webhook）
+
+只要在画布上同时放多个触发器节点即可——任一触发都启动整个 workflow。
+
+<TipCallout type="quest" title="扩展挑战">
+  写一个 workflow：同时有 Schedule（每小时）和 Webhook 两个触发器，让它的输出在两种触发方式下都能区分来源（用 `{`$execution.mode`}` 表达式）。
+</TipCallout>
+
+## 本节要点回顾
+
+- 5 类触发器：Manual / Schedule / Webhook / App Event / Sub-workflow
+- 选对触发器决定 workflow 适合什么场景
+- Schedule 注意时区；Webhook 注意 Test/Production URL 区别
+- App Trigger 多数底层也是 Webhook，省了你配置
+- 一个 workflow 可以**多个触发器并存**
+
+下一节学最常用的[万能节点：HTTP Request](../http-request/)。

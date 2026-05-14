@@ -1,0 +1,132 @@
+---
+title: Set Node · The Swiss Army Knife for Data Reshaping
+description: Add, modify, rename, delete fields — Set solves 80% of "I need to tweak this data" cases
+sidebar:
+  order: 4
+  label: 2.3 Set Node
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 2 · Section 3</span>
+
+Set is the **second most-used** node in n8n (after HTTP Request). It does four things: **add, modify, rename, delete** fields. Master it and 80% of "I just need to tweak this data" cases are solved.
+
+## What Set does
+
+| Operation | Example |
+|---|---|
+| **Add field** | `{name: "Alice"}` → `{name: "Alice", status: "new"}` |
+| **Change value** | `{age: 30}` → `{age: 31}` |
+| **Rename field** | `{firstName: "Alice"}` → `{name: "Alice"}` |
+| **Delete field** | `{name, _internal}` → `{name}` |
+
+## Mode 1 · Manual Mapping (recommended)
+
+<TerminalCell filename="set-manual.txt" runTag="⚙">
+{`Mode: Manual Mapping
+
+Fields to Set:
+  - Name: greeting          Value: Hello
+  - Name: timestamp         Value: ={{ $now.toISO() }}     ← expression
+  - Name: full_name         Value: ={{ $json.first }} {{ $json.last }}
+
+Include Other Fields?
+  - All Fields           ← keep all upstream data
+  - All Except <names>   ← exclude some
+  - None                 ← only new fields`}
+</TerminalCell>
+
+**The Include Other Fields choice is critical** — it decides whether Set strips upstream data or carries it through.
+
+## Mode 2 · JSON Mode (bulk reshape)
+
+<TerminalCell filename="set-json.txt" runTag="⚙">
+{`Mode: JSON
+
+JSON Output:
+{
+  "name": "{{ $json.first }} {{ $json.last }}",
+  "email": "{{ $json.email.toLowerCase() }}",
+  "company": "{{ $json.company || 'Unknown' }}",
+  "tags": ["auto-imported", "{{ $now.format('yyyy-MM') }}"]
+}`}
+</TerminalCell>
+
+**Use for:** rewriting many fields at once.
+
+## Real-world examples
+
+### A · Add a timestamp
+
+<TerminalCell filename="add-timestamp.txt" runTag="📍">
+{`In:   { "user": "Alice", "action": "login" }
+Set:  add field timestamp = {{ $now.toISO() }}, Include = All Fields
+Out:  { "user": "Alice", "action": "login", "timestamp": "..." }`}
+</TerminalCell>
+
+### B · Rename + clean
+
+<TerminalCell filename="rename-clean.txt" runTag="📍">
+{`In:   { "firstName": "Alice", "lastName": "X", "_internalId": 123 }
+Set:  name = {{ $json.firstName }} {{ $json.lastName }}
+      Include: All Except → firstName, lastName, _internalId
+Out:  { "name": "Alice X" }`}
+</TerminalCell>
+
+### C · Normalize before import
+
+<TerminalCell filename="normalize.txt" runTag="📍">
+{`In:   { "Email": "ALICE@X.COM ", "Phone": "+1 (555) 123-4567" }
+Set (JSON mode):
+{
+  "email": "{{ $json.Email.trim().toLowerCase() }}",
+  "phone": "{{ $json.Phone.replace(/[^0-9]/g, '') }}"
+}
+Out:  { "email": "alice@x.com", "phone": "15551234567" }`}
+</TerminalCell>
+
+## Old "Set" vs new "Edit Fields"
+
+The renamed node ("Edit Fields", typeVersion 3+) is what you should use for new workflows. Legacy "Set" nodes still work.
+
+<TipCallout type="warn" title="Where did `Keep Only Set` go?">
+  In the new node it became **Include Other Fields → None** (equivalent to the old Keep Only Set toggle).
+</TipCallout>
+
+## Set as a "small function"
+
+<TerminalCell filename="set-as-function.txt" runTag="💡">
+{`# Conditional
+status:  ={{ $json.score > 60 ? 'pass' : 'fail' }}
+
+# String manipulation
+slug:    ={{ $json.title.toLowerCase().replace(/\\s+/g, '-') }}
+
+# Date math
+deadline: ={{ DateTime.now().plus({days: 7}).toISO() }}
+
+# Array reduce
+total:   ={{ $json.items.reduce((sum, it) => sum + it.price, 0) }}`}
+</TerminalCell>
+
+Part 3 covers expressions in depth.
+
+<TipCallout type="tip" title="When not to use Set?">
+  Complex array filtering or per-item logic that goes beyond field-level reshaping? Use the Code node (JavaScript). Set is best for clean, per-item field work.
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Simplify the §1.3 Hello World: replace two Sets with one Set with two fields. Then add a `timestamp` field.
+</TipCallout>
+
+## Section recap
+
+- Set does four things: add / change / rename / delete fields
+- Two modes: Manual Mapping (clear) / JSON (bulk)
+- **Include Other Fields** controls upstream pass-through
+- Value supports full JS expressions
+- Use Code for complex array logic
+
+Next: a tour of [n8n's 450+ app nodes](../app-nodes/).
