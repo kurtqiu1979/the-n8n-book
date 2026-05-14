@@ -1,0 +1,102 @@
+---
+title: 安装 n8n · 三种姿势对比
+description: Cloud / Desktop / Docker —— 选哪种装法，5 分钟内有答案
+sidebar:
+  order: 2
+  label: 1.1 安装 n8n
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 1 章 · 第 1 节</span>
+
+把工具装起来，是所有学习的起点。n8n 提供了三种主流安装方式——选错了不要紧，工作流可以随时在三者之间迁移。这一节告诉你**它们各自适合谁、各自的坑在哪**。
+
+## 三选一速查表
+
+| 方式 | 适合 | 优点 | 缺点 |
+|---|---|---|---|
+| **Cloud** | 第一次接触、不想折腾 | 注册即用、自动备份、HTTPS 现成 | 月费、数据在他们服务器、并发受限 |
+| **Desktop** | 个人本地玩、轻度使用 | 一键装、本地数据 | macOS/Windows 客户端有些功能受限 |
+| **Docker** | 长期自托管、团队使用 | 完全自由、可上生产 | 需要点 Linux 基础 |
+
+零基础读者建议先从 **Cloud 试用 14 天**起步——学完前 2 部分再决定是否自建。
+
+## 方式 1 · n8n Cloud（最快）
+
+打开 [n8n.io](https://n8n.io)，点 "Get started for free" → 注册邮箱 → 选区域（欧/美/亚）→ 等 30 秒服务起好。完成。
+
+<TipCallout type="tip" title="试一下">
+  注册时如果填了"Workspace name"，它会作为你 URL 的子域名（如 `kurt.app.n8n.cloud`），后面分享 workflow 链接时会用到。
+</TipCallout>
+
+## 方式 2 · n8n Desktop（个人玩家）
+
+到 [n8n.io/download](https://n8n.io/download) 下载对应系统的安装包（Windows 是 `.exe`，macOS 是 `.dmg`）。装完打开就是一个本地服务，浏览器自动开 `http://localhost:5678`。
+
+数据存放路径：
+
+<TerminalCell filename="data-location.txt" runTag="📁">
+<span class="t-comment"># Windows</span>{`\n`}
+%APPDATA%\n8n\database.sqlite{`\n\n`}
+<span class="t-comment"># macOS</span>{`\n`}
+~/Library/Application Support/n8n/database.sqlite{`\n\n`}
+<span class="t-comment"># Linux</span>{`\n`}
+~/.n8n/database.sqlite
+</TerminalCell>
+
+## 方式 3 · Docker（长期方案）
+
+如果你打算让工作流 7×24 跑下去，Docker 是首选。
+
+<TerminalCell filename="docker-run.sh" runTag="▶ bash">
+<span class="t-comment"># 1 行起一个 n8n 实例（数据持久化到 ~/.n8n）</span>{`\n`}
+<span class="t-prompt">$</span> docker run -d \\{`\n`}
+&nbsp;&nbsp;--name n8n \\{`\n`}
+&nbsp;&nbsp;-p 5678:5678 \\{`\n`}
+&nbsp;&nbsp;-v ~/.n8n:/home/node/.n8n \\{`\n`}
+&nbsp;&nbsp;-e GENERIC_TIMEZONE="Asia/Shanghai" \\{`\n`}
+&nbsp;&nbsp;-e TZ="Asia/Shanghai" \\{`\n`}
+&nbsp;&nbsp;docker.n8n.io/n8nio/n8n{`\n\n`}
+<span class="t-success">→ 容器启动后访问 http://localhost:5678</span>
+</TerminalCell>
+
+如果你需要持久化用户数据（凭证、workflow），下面这份 `docker-compose.yml` 是社区推荐起手式：
+
+<TerminalCell filename="docker-compose.yml" runTag="📄">
+{`version: "3.8"`}{`\n`}
+{`services:`}{`\n`}
+{`  n8n:`}{`\n`}
+{`    image: docker.n8n.io/n8nio/n8n`}{`\n`}
+{`    restart: always`}{`\n`}
+{`    ports:`}{`\n`}
+{`      - "5678:5678"`}{`\n`}
+{`    environment:`}{`\n`}
+{`      - N8N_HOST=n8n.example.com`}{`\n`}
+{`      - WEBHOOK_URL=https://n8n.example.com/`}{`\n`}
+{`      - GENERIC_TIMEZONE=Asia/Shanghai`}{`\n`}
+{`    volumes:`}{`\n`}
+{`      - ./n8n_data:/home/node/.n8n`}
+</TerminalCell>
+
+<TipCallout type="warn" title="新手提示 · 加密密钥">
+  n8n 用一个本地密钥加密你的凭证（API Key、Token 等）。**Docker 跑起来后，第一件事是去 `~/.n8n/config` 里把 `encryptionKey` 备份下来**——这个文件丢了，所有凭证都得重新填一遍。
+</TipCallout>
+
+## 验证安装成功
+
+不管哪种方式，访问 `http://localhost:5678`（或 Cloud 的 URL）后能看到一个空白画布 + 左侧节点库，就算搞定。
+
+<TipCallout type="quest" title="扩展挑战">
+  装好后试着把 n8n 暴露到公网（用 ngrok 或反向代理），让外部 Webhook 能调到你的本地实例。这个能力在第 2 部分讲 Webhook 触发器时会用到。
+</TipCallout>
+
+## 本节要点回顾
+
+- 三种装法：Cloud（最快）/ Desktop（最简单）/ Docker（最自由）
+- 零基础推荐 Cloud 试用→Docker 自托管的路径
+- Docker 启动后**第一件事备份 `encryptionKey`**
+- 验证成功的标志：浏览器访问 5678 端口能看到画布
+
+下一节我们[逛一遍 n8n 的编辑器](../editor-tour/)。

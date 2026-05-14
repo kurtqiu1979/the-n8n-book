@@ -1,0 +1,117 @@
+---
+title: 编辑器界面巡礼
+description: 画布、节点库、表达式编辑器、快捷键 —— 让 n8n 的 UI 变得"熟"
+sidebar:
+  order: 3
+  label: 1.2 编辑器巡礼
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 1 章 · 第 2 节</span>
+
+熟悉一个工具的第一步，是知道它的"零件都放在哪"。n8n 的编辑器很克制——核心只有 4 块：**画布、节点库、节点参数面板、执行面板**。这一节快速过一遍，让你按图索骥。
+
+## 4 块区域全景
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  顶部工具栏 · Save / Execute Workflow / 名称 / 切换激活态     │
+├──────────┬─────────────────────────────────────────────────┤
+│          │                                                 │
+│  节点    │           画布 (Canvas)                          │
+│  库      │           ┌──┐    ┌──┐    ┌──┐                  │
+│ (左)     │           │A │───▶│B │───▶│C │                  │
+│          │           └──┘    └──┘    └──┘                  │
+│          │                                                 │
+├──────────┴─────────────────────────────────────────────────┤
+│  底部 · Executions / 运行历史 / 日志                         │
+└────────────────────────────────────────────────────────────┘
+```
+
+点击任一节点，右侧会滑出**节点参数面板**——这是你大部分操作发生的地方。
+
+## 区域 1 · 画布（Canvas）
+
+把节点拖到这里、用线连起来。常用操作：
+
+- **左键拖** → 移动画布
+- **滚轮 / Pinch** → 缩放
+- **空格 + 拖** → 临时平移视角
+- **右键** → 复制 / 粘贴 / Disable Node / Edit JSON
+- **`+` 号点击节点输出口** → 直接增加下一个节点（最常用！）
+
+<TipCallout type="tip" title="试一下">
+  在空白画布上**右键 → Paste**，粘贴下面这段 JSON，会瞬间出现一个完整 workflow——这是 n8n 最强的"分享和复用"方式。本书所有案例都靠这个机制让你"导入即用"。
+</TipCallout>
+
+## 区域 2 · 节点库（左侧）
+
+按 **Tab 键**或点画布上任意 `+` 出现搜索框，输入关键词就能找节点。比如 "HTTP" 出来 HTTP Request、Webhook；输入 "AI" 出来一堆 LangChain 节点。
+
+节点按类型分三类（图标颜色不同）：
+
+| 类型 | 颜色 | 例子 |
+|---|---|---|
+| **Trigger** 触发器 | 绿色 | Schedule、Webhook、GitHub Trigger |
+| **Action** 动作 | 蓝色 | HTTP Request、Set、Slack |
+| **Core** 内置 | 灰色 | IF、Switch、Merge、Code |
+
+## 区域 3 · 节点参数面板（右侧）
+
+点节点 → 滑出来。三个 tab：
+
+- **Parameters** —— 配置该节点的核心参数（URL、Method、Body…）
+- **Settings** —— 错误处理、超时、Notes 注释
+- **Docs** —— 直接跳官方该节点的文档
+
+### 表达式模式
+
+很多输入框右上角有个 `fx` 小按钮。点一下从"固定值"切到"表达式模式"——这是后面第 3 部分要重点讲的内容。简单说：**表达式模式下，`{{ $json.field }}` 会被求值，普通模式下被当字面量。**
+
+<TerminalCell filename="expression-vs-literal.txt" runTag="💡">
+{`# 固定值模式
+URL: https://api.com/users/{{ $json.id }}
+# → 真的请求 .../users/{{ $json.id }}，URL 里含字面量
+
+# 表达式模式（点 fx 后）
+URL: https://api.com/users/{{ $json.id }}
+# → 被求值为 .../users/123（假设 $json.id = 123）`}
+</TerminalCell>
+
+## 区域 4 · Executions / 执行面板（底部）
+
+每次手动运行或定时触发都会在这里留一条记录。点开能看到**每个节点收到了什么、输出了什么**——这是调试时的命根子。
+
+记住一句口诀：**"出问题先看 Executions"**。
+
+## 快捷键速查
+
+| 操作 | Mac | Windows |
+|---|---|---|
+| Save workflow | `⌘ S` | `Ctrl S` |
+| Execute workflow | `⌘ Enter` | `Ctrl Enter` |
+| Add node | `Tab` | `Tab` |
+| Duplicate node | `⌘ D` | `Ctrl D` |
+| Disable selected | `D` | `D` |
+| 全选 | `⌘ A` | `Ctrl A` |
+| Search workflow / nodes | `⌘ K` | `Ctrl K` |
+
+<TipCallout type="warn" title="新手提示 · Save 不等于 Activate">
+  Save 只是把工作流的"代码"存下来；Trigger 类工作流要让它真的在后台跑起来，还需要顶部右上角的"**Inactive → Active**"开关。这两个概念新手最容易混。
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  熟悉了快捷键之后，试着只用键盘从零完成一个"手动触发 → Set 输出 hello → 执行"的工作流。能做到说明 UI 你已经摸顺了。
+</TipCallout>
+
+## 本节要点回顾
+
+- 编辑器 = 画布 + 节点库 + 参数面板 + 执行面板，4 块就够
+- 节点三色：绿（触发）/ 蓝（动作）/ 灰（内置）
+- `fx` 按钮切表达式模式 —— 后续课程的关键
+- 调试入口永远是底部的 Executions
+- Save ≠ Activate，活动开关在右上角
+
+下一节[做你的第一个 Workflow](../first-workflow/)。

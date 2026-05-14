@@ -1,0 +1,102 @@
+---
+title: Install n8n · Three Ways Compared
+description: Cloud / Desktop / Docker — pick the right one in five minutes
+sidebar:
+  order: 2
+  label: 1.1 Install n8n
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 1 · Section 1</span>
+
+Getting the tool installed is where everything starts. n8n offers three main install paths — picking the wrong one isn't a problem, workflows are portable between them. This section tells you **who each one is for and where the gotchas live**.
+
+## Quick comparison
+
+| Method | Best for | Pros | Cons |
+|---|---|---|---|
+| **Cloud** | First-timers, no setup | Sign-up = ready · auto-backups · HTTPS done | Monthly fee · data on their servers · concurrency limits |
+| **Desktop** | Solo local use | One-click install · local data | Some features limited on macOS/Windows clients |
+| **Docker** | Long-term self-hosted, teams | Total freedom · production-ready | Needs basic Linux skills |
+
+Beginners: start with **Cloud's 14-day trial**, then decide whether to self-host after finishing Parts 1–2.
+
+## Method 1 · n8n Cloud (fastest)
+
+Visit [n8n.io](https://n8n.io) → "Get started for free" → sign up → pick a region → wait ~30s. Done.
+
+<TipCallout type="tip" title="Try it">
+  If you fill in a "Workspace name" during signup, it becomes a subdomain (e.g. `kurt.app.n8n.cloud`). You'll use this URL later when sharing workflows.
+</TipCallout>
+
+## Method 2 · n8n Desktop (solo player)
+
+Grab the installer from [n8n.io/download](https://n8n.io/download) (`.exe` for Windows, `.dmg` for macOS). Run it, browser auto-opens `http://localhost:5678`.
+
+Data lives at:
+
+<TerminalCell filename="data-location.txt" runTag="📁">
+<span class="t-comment"># Windows</span>{`\n`}
+%APPDATA%\n8n\database.sqlite{`\n\n`}
+<span class="t-comment"># macOS</span>{`\n`}
+~/Library/Application Support/n8n/database.sqlite{`\n\n`}
+<span class="t-comment"># Linux</span>{`\n`}
+~/.n8n/database.sqlite
+</TerminalCell>
+
+## Method 3 · Docker (long-haul)
+
+If you plan to run workflows 24/7, Docker is the obvious choice.
+
+<TerminalCell filename="docker-run.sh" runTag="▶ bash">
+<span class="t-comment"># One-liner: spin up n8n with persistent data in ~/.n8n</span>{`\n`}
+<span class="t-prompt">$</span> docker run -d \\{`\n`}
+&nbsp;&nbsp;--name n8n \\{`\n`}
+&nbsp;&nbsp;-p 5678:5678 \\{`\n`}
+&nbsp;&nbsp;-v ~/.n8n:/home/node/.n8n \\{`\n`}
+&nbsp;&nbsp;-e GENERIC_TIMEZONE="UTC" \\{`\n`}
+&nbsp;&nbsp;-e TZ="UTC" \\{`\n`}
+&nbsp;&nbsp;docker.n8n.io/n8nio/n8n{`\n\n`}
+<span class="t-success">→ visit http://localhost:5678</span>
+</TerminalCell>
+
+For multi-service / persistent setup, the community-recommended `docker-compose.yml`:
+
+<TerminalCell filename="docker-compose.yml" runTag="📄">
+{`version: "3.8"`}{`\n`}
+{`services:`}{`\n`}
+{`  n8n:`}{`\n`}
+{`    image: docker.n8n.io/n8nio/n8n`}{`\n`}
+{`    restart: always`}{`\n`}
+{`    ports:`}{`\n`}
+{`      - "5678:5678"`}{`\n`}
+{`    environment:`}{`\n`}
+{`      - N8N_HOST=n8n.example.com`}{`\n`}
+{`      - WEBHOOK_URL=https://n8n.example.com/`}{`\n`}
+{`      - GENERIC_TIMEZONE=UTC`}{`\n`}
+{`    volumes:`}{`\n`}
+{`      - ./n8n_data:/home/node/.n8n`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Beginner pitfall · encryption key">
+  n8n encrypts your credentials (API keys, tokens) with a local key. **After Docker starts, your very first task is to back up `encryptionKey` from `~/.n8n/config`** — lose this file and every credential needs to be re-entered.
+</TipCallout>
+
+## Verify your install
+
+Whichever path you took, visiting `http://localhost:5678` (or your Cloud URL) and seeing an empty canvas with the node library on the left means you're done.
+
+<TipCallout type="quest" title="Extension challenge">
+  Expose your local n8n to the public internet via ngrok or a reverse proxy. You'll need this in Part 2 to receive real Webhook events from external services.
+</TipCallout>
+
+## Section recap
+
+- Three methods: Cloud (fastest) / Desktop (simplest) / Docker (most flexible)
+- Beginners: try Cloud → graduate to Docker
+- **First Docker step: back up `encryptionKey`**
+- Success = port 5678 shows the canvas
+
+Next up: [a tour of the editor](../editor-tour/).

@@ -1,0 +1,119 @@
+---
+title: Execution Mechanics
+description: Read logs, use Pinned data, understand how Executions are counted
+sidebar:
+  order: 6
+  label: 1.5 Execution
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 1 · Section 5</span>
+
+Every time you press "Test workflow" or a trigger fires, n8n runs one **Execution**. Understanding its lifecycle is the foundation for all future debugging.
+
+## What is an Execution?
+
+A run from trigger start until **every branch finishes (or some node crashes)**.
+
+Each Execution is persisted to the database (Cloud / Docker / Desktop alike). Browse history anytime via the bottom **Executions** tab.
+
+<TerminalCell filename="execution-record.json" runTag="📜">
+<span class="t-comment"># Fields on a single Execution record</span>{`\n`}
+{`{`}{`\n`}
+{`  "id": "abc123",`}{`\n`}
+{`  "startedAt": "2026-05-13T10:23:45Z",`}{`\n`}
+{`  "stoppedAt": "2026-05-13T10:23:47Z",`}{`\n`}
+{`  "mode": "manual",            `}<span class="t-comment">// or trigger / webhook / cli</span>{`\n`}
+{`  "finished": true,`}{`\n`}
+{`  "status": "success",          `}<span class="t-comment">// or error / running / canceled</span>{`\n`}
+{`  "workflowId": "wf-42",`}{`\n`}
+{`  "data": { /* per-node I/O */ }`}{`\n`}
+{`}`}
+</TerminalCell>
+
+## Three execution modes
+
+| Mode | When | Notes |
+|---|---|---|
+| **Manual** | Dev/debug | Requires editor open + clicking Test |
+| **Trigger** | Production | Workflow is Active; trigger condition fires it |
+| **Webhook** | External calls | HTTP request hits the URL; **only works when Active** |
+
+<TipCallout type="warn" title="Top webhook confusion · why no response?">
+  Webhook nodes show **two URLs** in the editor: Test URL and Production URL.  
+  - **Test URL** only works briefly after you press "Listen for test event"  
+  - **Production URL** only works when the workflow is **Active**  
+  
+  Active toggle is top-right. **This explains 90% of "my webhook isn't working" cases.**
+</TipCallout>
+
+## Pinned Data: the debug superpower
+
+While developing you often re-run dozens of times. Re-fetching real data each time is slow (HTTP Request hitting external APIs).
+
+n8n lets you **pin a node's current output** — subsequent runs use the pinned data, no external call.
+
+How: in the node's output panel, top-right → "**Pin data**". A pin icon appears.
+
+<TerminalCell filename="pinned-data.txt" runTag="📌">
+<span class="t-comment"># Without pin: real GET every time</span>{`\n`}
+<span class="t-prompt">▶</span> HTTP Request → GET api.github.com/...  → 340ms{`\n\n`}
+<span class="t-comment"># With pin: 0ms, no API quota used</span>{`\n`}
+<span class="t-prompt">📌</span> HTTP Request → (pinned data) → 0ms{`\n\n`}
+<span class="t-success">→ debug 100× faster, no quota burn</span>
+</TerminalCell>
+
+**Remember to Unpin** after debugging — otherwise production runs on fake data.
+
+## Reading logs
+
+Click any node → output tab to see the **last execution's** I/O.
+
+For history: bottom **Executions** tab → list of recent runs → click any to "ghost-replay" the workflow's state. Use **Retry** to re-run with the same input.
+
+## Failed Executions
+
+Any node throwing → entire Execution becomes `error` → downstream nodes don't run.
+
+The failed node shows a **red exclamation**. Click it → Errors tab → see the message.
+
+<TerminalCell filename="error-execution.txt" runTag="⚠">
+<span class="t-comment"># Slack node was misconfigured (wrong channel)</span>{`\n`}
+<span style="color: #f85149;">✗ Slack: channel_not_found</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// upstream still ran successfully; downstream halts</span>{`\n\n`}
+<span class="t-keyword">Fix:</span>{`\n`}
+&nbsp;&nbsp;1. Settings → "Continue On Fail" toggle{`\n`}
+&nbsp;&nbsp;2. Or attach an Error Trigger (covered in Part 4)
+</TerminalCell>
+
+## Data retention
+
+By default n8n keeps **all** Execution data. Disk fills up. In production, set:
+
+<TerminalCell filename="prune-config.env" runTag="🧹">
+<span class="t-comment"># Docker environment example</span>{`\n`}
+<span class="t-keyword">EXECUTIONS_DATA_PRUNE</span>=true{`\n`}
+<span class="t-keyword">EXECUTIONS_DATA_MAX_AGE</span>=336        <span class="t-comment"># 14 days (hours)</span>{`\n`}
+<span class="t-keyword">EXECUTIONS_DATA_PRUNE_MAX_COUNT</span>=10000   <span class="t-comment"># keep at most 10K rows</span>
+</TerminalCell>
+
+<TipCallout type="tip" title="Try it · check your own Executions">
+  Open any workflow → bottom **Executions** tab. Even Hello World has a few entries — each Test click adds one.
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Activate the Hello World from §1.3 (right-top Active switch). Manual trigger won't fire — nothing happens. Now **change the trigger to Schedule (every minute)**. Watch Executions auto-accrue once a minute.
+</TipCallout>
+
+## Section recap
+
+- One run = one Execution, all recorded
+- Three modes: Manual / Trigger / Webhook
+- **Active toggle** = trigger lives or dies in the background
+- **Pin data** = debug superpower; remember to Unpin
+- Errors halt downstream; recover via Continue On Fail or Error Trigger (Part 4)
+- Configure data retention in production
+
+You've finished **Part 1**. Next we learn nodes — starting with [Triggers overview](../../02-nodes/triggers/).

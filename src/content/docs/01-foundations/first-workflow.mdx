@@ -1,0 +1,161 @@
+---
+title: 你的第一个 Workflow · Hello World
+description: 用 3 个节点跑通 n8n 全流程：手动触发 → Set → 输出
+sidebar:
+  order: 4
+  label: 1.3 第一个 Workflow
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../components/WorkflowViewer.tsx';
+
+export const workflow = {
+  name: "Hello World",
+  nodes: [
+    {
+      parameters: {},
+      id: "node-trigger",
+      name: "When clicking Test",
+      type: "n8n-nodes-base.manualTrigger",
+      typeVersion: 1,
+      position: [240, 300]
+    },
+    {
+      parameters: {
+        values: {
+          string: [
+            { name: "greeting", value: "Hello" },
+            { name: "subject", value: "n8n World" }
+          ]
+        }
+      },
+      id: "node-set",
+      name: "Set greeting",
+      type: "n8n-nodes-base.set",
+      typeVersion: 3.2,
+      position: [520, 300]
+    },
+    {
+      parameters: {
+        values: {
+          string: [
+            { name: "message", value: "={{ $json.greeting }}, {{ $json.subject }}!" }
+          ]
+        }
+      },
+      id: "node-set2",
+      name: "Compose message",
+      type: "n8n-nodes-base.set",
+      typeVersion: 3.2,
+      position: [800, 300]
+    }
+  ],
+  connections: {
+    "When clicking Test": {
+      main: [[ { node: "Set greeting", type: "main", index: 0 } ]]
+    },
+    "Set greeting": {
+      main: [[ { node: "Compose message", type: "main", index: 0 } ]]
+    }
+  }
+};
+
+<span class="editorial-label">第 1 章 · 第 3 节</span>
+
+理论看再多不如手过一遍。这一节我们用 3 个节点搞一个最朴素的"Hello World"——你会**亲眼看到数据是如何在节点之间流动的**。
+
+## 我们要做什么
+
+一个 3 节点的工作流：
+
+1. **When clicking Test** —— 手动触发器（你按按钮，它启动）
+2. **Set greeting** —— 设置两个字段：`greeting: "Hello"` + `subject: "n8n World"`
+3. **Compose message** —— 拼成一句话：`Hello, n8n World!`
+
+下面是它的样子：
+
+<TerminalCell filename="hello-world.workflow.json" level="Lv.1" runTag="▦ preview">
+<WorkflowViewer client:load workflow={workflow} height={260} />
+</TerminalCell>
+
+## 步骤 1 · 加 Manual Trigger
+
+新建一个空白 workflow，在画布上点 "Add first step..." → 选 "Trigger manually"（或英文 "When clicking 'Test workflow'"）。
+
+这是最简单的触发器——你不点它，工作流不动。**学习阶段所有 demo 都用它**。
+
+## 步骤 2 · 加 Set 节点
+
+点 trigger 节点右侧的 `+` → 搜索 "Set" → 选 "Edit Fields (Set)"。
+
+在 Parameters 区设置两个字符串字段：
+
+<TerminalCell filename="set-config.txt" runTag="⚙">
+<span class="t-keyword">Field 1:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Name</span> greeting{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Value</span> Hello{`\n\n`}
+<span class="t-keyword">Field 2:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Name</span> subject{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Value</span> n8n World
+</TerminalCell>
+
+## 步骤 3 · 再加一个 Set 节点，把它们拼起来
+
+再来一个 Set，这次只有一个字段，**但要切换到表达式模式**（点 Value 输入框右边的 `fx` 按钮）：
+
+<TerminalCell filename="set2-config.txt" runTag="⚙">
+<span class="t-keyword">Field:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Name</span> message{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Value (Expression mode ⚡)</span>{`\n`}
+&nbsp;&nbsp;<span class="t-link">{'{{ $json.greeting }}, {{ $json.subject }}!'}</span>
+</TerminalCell>
+
+`$json` 指代**上一个节点的输出 JSON**。所以 `$json.greeting` 拿到 `"Hello"`，`$json.subject` 拿到 `"n8n World"`。
+
+## 步骤 4 · 执行
+
+顶部点 "**Test workflow**" 按钮。如果一切正常，每个节点会出现绿色小勾，点最后那个 Set 节点查看输出：
+
+<TerminalCell filename="execution-output.txt" runTag="▶ run" actionLabel="Copy Workflow JSON ↗">
+<span class="t-success">→ Compose message · 1 item</span>{`\n`}
+{`[`}{`\n`}
+{`  {`}{`\n`}
+{`    "greeting": "Hello",`}{`\n`}
+{`    "subject": "n8n World",`}{`\n`}
+{`    "message": "Hello, n8n World!"`}{`\n`}
+{`  }`}{`\n`}
+{`]`}
+</TerminalCell>
+
+注意 `message` 字段下面的值——`Hello, n8n World!`——正是被表达式拼出来的结果。
+
+## 复制并自己跑一遍
+
+<TerminalCell filename="hello-world.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+{`\n`}<span class="t-comment"># 复制后到 n8n 画布右键 → Paste 即导入</span>
+</TerminalCell>
+
+<TipCallout type="tip" title="为什么 Set 出现了两次？">
+  其实可以合并成一个 Set 节点的两个字段。这里拆开是为了**让你看到数据如何在节点之间流动**——第一个 Set 的输出，正是第二个 Set 的输入。这种"链"是 n8n 最核心的玩法。
+</TipCallout>
+
+<TipCallout type="warn" title="新手提示 · 表达式输入框为什么不见?">
+  如果你点了 `fx` 但没看到代码框，说明已经在表达式模式了——只是输入框的样子变了（背景变粉、左上角有 `Expression` 小字）。再次点 `fx` 会切回固定值模式。
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  把第二个 Set 的输出再接一个节点：发到 Slack / Telegram / 自己的 Webhook 上。这样你就有了一个**最小但完整**的"触发 → 处理 → 通知"链。
+</TipCallout>
+
+## 本节要点回顾
+
+- 一个 workflow = 触发器 + 一串处理节点 + （可选）输出节点
+- `$json` 指代上一个节点的输出 JSON
+- 表达式 `{{ ... }}` 必须在表达式模式下才会被求值
+- "Test workflow" 按钮触发手动执行
+- 节点出绿勾 = 这一步执行成功
+
+下一节，我们深入讲讲**数据流到底是怎么走的**——[Item 心智模型](../mental-model/)。

@@ -1,0 +1,117 @@
+---
+title: Editor Tour
+description: Canvas, node library, expression editor, keyboard shortcuts — get familiar with the UI
+sidebar:
+  order: 3
+  label: 1.2 Editor Tour
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 1 · Section 2</span>
+
+Learning a tool starts with knowing "where the parts are." n8n's editor is admirably minimal — only four regions: **Canvas, Node Library, Parameter Panel, Execution Panel**. This section walks the map.
+
+## Four regions at a glance
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  Toolbar · Save / Execute Workflow / Name / Active toggle  │
+├──────────┬─────────────────────────────────────────────────┤
+│          │                                                 │
+│  Node    │           Canvas                                │
+│  Library │           ┌──┐    ┌──┐    ┌──┐                  │
+│ (left)   │           │A │───▶│B │───▶│C │                  │
+│          │           └──┘    └──┘    └──┘                  │
+│          │                                                 │
+├──────────┴─────────────────────────────────────────────────┤
+│  Bottom · Executions / run history / logs                  │
+└────────────────────────────────────────────────────────────┘
+```
+
+Click any node and the **Parameter Panel** slides in from the right — that's where most of your config work happens.
+
+## Region 1 · Canvas
+
+Drag nodes here and connect them with lines. Common ops:
+
+- **Left-drag** → move canvas
+- **Wheel / Pinch** → zoom
+- **Space + drag** → temporary pan
+- **Right-click** → copy / paste / disable / Edit JSON
+- **Click `+` at a node's output handle** → add the next node (most common!)
+
+<TipCallout type="tip" title="Try it">
+  Right-click an empty canvas → **Paste** with workflow JSON in your clipboard, and a complete workflow appears. This is n8n's strongest sharing primitive — every case in this book uses it for "import and run."
+</TipCallout>
+
+## Region 2 · Node Library (left)
+
+Press **Tab** or click any `+` to open the search box. Type "HTTP" and you get HTTP Request, Webhook; type "AI" for LangChain nodes.
+
+Nodes come in three types (color-coded):
+
+| Type | Color | Examples |
+|---|---|---|
+| **Trigger** | Green | Schedule, Webhook, GitHub Trigger |
+| **Action** | Blue | HTTP Request, Set, Slack |
+| **Core** | Gray | IF, Switch, Merge, Code |
+
+## Region 3 · Parameter Panel (right)
+
+Click a node → it slides in. Three tabs:
+
+- **Parameters** — the node's core config (URL, Method, Body, …)
+- **Settings** — error handling, timeout, notes
+- **Docs** — jump directly to the official node docs
+
+### Expression mode
+
+Most input fields have a small `fx` button in the top right. Click it to toggle from "fixed value" to "expression mode" — covered in depth in Part 3. The short version: **in expression mode, `{{ $json.field }}` is evaluated; in normal mode, it's treated as a literal string.**
+
+<TerminalCell filename="expression-vs-literal.txt" runTag="💡">
+{`# Fixed-value mode
+URL: https://api.com/users/{{ $json.id }}
+# → literally requests .../users/{{ $json.id }}, URL contains literal text
+
+# Expression mode (after clicking fx)
+URL: https://api.com/users/{{ $json.id }}
+# → evaluates to .../users/123 (assuming $json.id = 123)`}
+</TerminalCell>
+
+## Region 4 · Executions (bottom)
+
+Every manual run and timer-triggered run lands here. Click any row to see **what each node received and emitted** — this is your lifeline when debugging.
+
+Mantra: **"When something breaks, check Executions first."**
+
+## Keyboard shortcuts
+
+| Action | Mac | Windows |
+|---|---|---|
+| Save workflow | `⌘ S` | `Ctrl S` |
+| Execute workflow | `⌘ Enter` | `Ctrl Enter` |
+| Add node | `Tab` | `Tab` |
+| Duplicate node | `⌘ D` | `Ctrl D` |
+| Disable selected | `D` | `D` |
+| Select all | `⌘ A` | `Ctrl A` |
+| Search | `⌘ K` | `Ctrl K` |
+
+<TipCallout type="warn" title="Save ≠ Activate">
+  Save persists the workflow definition. To make a trigger workflow actually run in the background, flip the **Inactive → Active** switch in the top-right. New users mix these two up constantly.
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Build a "Manual Trigger → Set 'hello' → Execute" workflow using only the keyboard. If you can, you've internalized the UI.
+</TipCallout>
+
+## Section recap
+
+- Editor = Canvas + Node Library + Parameter Panel + Executions, four regions
+- Three node colors: green (trigger), blue (action), gray (core)
+- The `fx` button toggles expression mode
+- Debug entry is always the bottom Executions tab
+- Save ≠ Activate; the toggle is top-right
+
+Next: [build your first workflow](../first-workflow/).

@@ -1,0 +1,125 @@
+---
+title: The Mental Model · Items / JSON / Iteration
+description: The three concepts you must understand to "read" any n8n workflow
+sidebar:
+  order: 5
+  label: 1.4 Mental Model
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 1 · Section 4</span>
+
+This is the section beginners **most often skip and most often regret**. Once you've internalized **Items / JSON / Iteration**, every workflow becomes legible.
+
+## One-sentence summary
+
+> **n8n data is always "an array of JSON objects." Each object is an Item. Each node runs once per Item, automatically.**
+
+Dense, but unpack it slowly.
+
+## What is an Item?
+
+Open any executed node, peek at its output tab. You'll see something like:
+
+<TerminalCell filename="node-output.json" runTag="📤">
+{`[`}{`\n`}
+{`  { "name": "Alice", "age": 30 },`}{`\n`}
+{`  { "name": "Bob",   "age": 25 },`}{`\n`}
+{`  { "name": "Carol", "age": 28 }`}{`\n`}
+{`]`}
+</TerminalCell>
+
+**The whole thing** is an array (`[...]`) — n8n's universal data wrapper.  
+**Each element** is an object (`{...}`) — that's one **Item**.
+
+This node emits **3 Items**.
+
+## Nodes iterate over Items
+
+The key insight: **the next node receives this array and runs once per item, automatically.**
+
+If the next node is HTTP Request (look this person up via API), it makes **three requests**:
+
+<TerminalCell filename="iteration.txt" runTag="🔄">
+<span class="t-comment"># HTTP Request · URL configured as .../users/{'{{ $json.name }}'}</span>{`\n\n`}
+<span class="t-prompt">▶ run 1:</span> GET /users/Alice  → {`{`} ... {`}`}{`\n`}
+<span class="t-prompt">▶ run 2:</span> GET /users/Bob    → {`{`} ... {`}`}{`\n`}
+<span class="t-prompt">▶ run 3:</span> GET /users/Carol  → {`{`} ... {`}`}{`\n\n`}
+<span class="t-success">→ output: still a 3-item array</span>
+</TerminalCell>
+
+This is n8n's **biggest departure** from regular programming: you never write `for` loops — nodes iterate themselves.
+
+## $json is "the current Item being processed"
+
+Back to `{{ $json.name }}`. During iteration, `$json` automatically refers to the current item:
+
+| Iteration | `$json` is | `$json.name` evaluates to |
+|---|---|---|
+| 1st | `{ "name": "Alice", "age": 30 }` | `"Alice"` |
+| 2nd | `{ "name": "Bob", "age": 25 }` | `"Bob"` |
+| 3rd | `{ "name": "Carol", "age": 28 }` | `"Carol"` |
+
+**This is the heart of expressions**: `$json` isn't fixed — it varies with iteration.
+
+## Referencing previous and arbitrary nodes
+
+`$json` only refers to the **immediately previous** node. For earlier nodes, use `$('NodeName')`:
+
+<TerminalCell filename="references.txt" runTag="🔍">
+<span class="t-comment"># reference the latest (default)</span>{`\n`}
+{'{{ $json.name }}'}{`\n\n`}
+<span class="t-comment"># reference a node named "Get Users"</span>{`\n`}
+{'{{ $(\'Get Users\').item.json.name }}'}{`\n\n`}
+<span class="t-comment"># all items of "Get Users"</span>{`\n`}
+{'{{ $(\'Get Users\').all() }}'}{`\n\n`}
+<span class="t-comment"># the first item of "Get Users"</span>{`\n`}
+{'{{ $(\'Get Users\').first().json.name }}'}
+</TerminalCell>
+
+We'll go deep on this syntax in Part 3.
+
+## Single Item or multiple Items?
+
+Not every node emits many. For instance:
+
+- **Manual Trigger** → always **1 empty Item** (`[{}]`)
+- **HTTP Request** (GET one resource) → **1 Item**
+- **Google Sheets** (read 100 rows) → **100 Items**
+- **Webhook** (one request received) → **1 Item**
+
+**Your workflow logic** typically: fetch many Items from somewhere, then let downstream nodes iterate.
+
+<TipCallout type="warn" title="Beginner's biggest trap · `.item` vs `.first()`">
+  `$('NodeName').item` is a special variable — it references "the item that pairs with the current iteration." For this to work, n8n must be able to align iterations between two nodes — which isn't always possible. When in doubt, use `$('NodeName').first().json.x` — safer. Part 3 covers this trap in detail.
+</TipCallout>
+
+## Demo: a real two-node flow
+
+<TerminalCell filename="real-flow.txt" runTag="📊">
+<span class="t-keyword">Node A · Google Sheets:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// read a "Customers" sheet → emits 50 items</span>{`\n`}
+&nbsp;&nbsp;<span class="t-success">[{`{`} "email": "a@x.com", "name": "Alice" {`}`}, ... 49 more]</span>{`\n\n`}
+<span class="t-keyword">Node B · Send Email:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// To: {'{{ $json.email }}'}</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Subject: Hello {'{{ $json.name }}'}</span>{`\n`}
+&nbsp;&nbsp;<span class="t-prompt">▶ auto-sends 50 emails</span>
+</TerminalCell>
+
+**You wrote no loop**. 50 Items made Node B run 50 times. This is the abstraction magic of n8n.
+
+<TipCallout type="quest" title="Extension challenge">
+  Modify the Hello World from §1.3 so the Set node emits **3 Items** instead of 1. See how many items the Compose Message step outputs.
+</TipCallout>
+
+## Section recap
+
+- n8n data = **array of JSON objects**, each is an **Item**
+- Nodes **iterate over Items** automatically
+- `$json` = "the Item being processed right now"
+- Cross-reference other nodes: `$('NodeName').first().json.field`
+- No `for` loops — iteration is built-in
+
+Next: what really happens during a run — [Execution mechanics](../execution/).

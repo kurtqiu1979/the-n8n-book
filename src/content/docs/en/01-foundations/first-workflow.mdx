@@ -1,0 +1,123 @@
+---
+title: Your First Workflow · Hello World
+description: Three nodes that show the whole n8n flow — Manual Trigger → Set → Output
+sidebar:
+  order: 4
+  label: 1.3 First Workflow
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+
+export const workflow = {
+  name: "Hello World",
+  nodes: [
+    { parameters: {}, id: "node-trigger", name: "When clicking Test", type: "n8n-nodes-base.manualTrigger", typeVersion: 1, position: [240, 300] },
+    { parameters: { values: { string: [ { name: "greeting", value: "Hello" }, { name: "subject", value: "n8n World" } ] } }, id: "node-set", name: "Set greeting", type: "n8n-nodes-base.set", typeVersion: 3.2, position: [520, 300] },
+    { parameters: { values: { string: [ { name: "message", value: "={{ $json.greeting }}, {{ $json.subject }}!" } ] } }, id: "node-set2", name: "Compose message", type: "n8n-nodes-base.set", typeVersion: 3.2, position: [800, 300] }
+  ],
+  connections: {
+    "When clicking Test": { main: [[ { node: "Set greeting", type: "main", index: 0 } ]] },
+    "Set greeting": { main: [[ { node: "Compose message", type: "main", index: 0 } ]] }
+  }
+};
+
+<span class="editorial-label">Chapter 1 · Section 3</span>
+
+Theory is no substitute for doing it once. This section builds the most modest "Hello World" with 3 nodes — and you'll **see data flowing between nodes with your own eyes**.
+
+## What we're building
+
+A 3-node workflow:
+
+1. **When clicking Test** — manual trigger (you press a button, it runs)
+2. **Set greeting** — sets two fields: `greeting: "Hello"` + `subject: "n8n World"`
+3. **Compose message** — composes them into: `Hello, n8n World!`
+
+Here's how it looks:
+
+<TerminalCell filename="hello-world.workflow.json" level="Lv.1" runTag="▦ preview">
+<WorkflowViewer client:load workflow={workflow} height={260} />
+</TerminalCell>
+
+## Step 1 · Add the Manual Trigger
+
+Create a new workflow. On the canvas click "Add first step..." → choose "Trigger manually" (a.k.a. "When clicking 'Test workflow'").
+
+The simplest trigger — nothing happens until you press the button. **Every demo in the learning phase uses it.**
+
+## Step 2 · Add a Set node
+
+Click `+` on the trigger's right side → search "Set" → pick "Edit Fields (Set)".
+
+In Parameters, set two string fields:
+
+<TerminalCell filename="set-config.txt" runTag="⚙">
+<span class="t-keyword">Field 1:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Name</span> greeting{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Value</span> Hello{`\n\n`}
+<span class="t-keyword">Field 2:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Name</span> subject{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Value</span> n8n World
+</TerminalCell>
+
+## Step 3 · Another Set, with an expression
+
+Add a second Set. This time one field — **and switch to expression mode** (click `fx` next to the Value input):
+
+<TerminalCell filename="set2-config.txt" runTag="⚙">
+<span class="t-keyword">Field:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Name</span> message{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Value (Expression mode ⚡)</span>{`\n`}
+&nbsp;&nbsp;<span class="t-link">{'{{ $json.greeting }}, {{ $json.subject }}!'}</span>
+</TerminalCell>
+
+`$json` references **the previous node's output JSON**. So `$json.greeting` gets `"Hello"`, `$json.subject` gets `"n8n World"`.
+
+## Step 4 · Execute
+
+Click "**Test workflow**" at the top. If all goes well, each node gets a green checkmark — click the last Set to see its output:
+
+<TerminalCell filename="execution-output.txt" runTag="▶ run">
+<span class="t-success">→ Compose message · 1 item</span>{`\n`}
+{`[`}{`\n`}
+{`  {`}{`\n`}
+{`    "greeting": "Hello",`}{`\n`}
+{`    "subject": "n8n World",`}{`\n`}
+{`    "message": "Hello, n8n World!"`}{`\n`}
+{`  }`}{`\n`}
+{`]`}
+</TerminalCell>
+
+That `message` field — `Hello, n8n World!` — is the result of the expression.
+
+## Copy and try yourself
+
+<TerminalCell filename="hello-world.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+{`\n`}<span class="t-comment"># Paste it on the canvas with right-click → Paste</span>
+</TerminalCell>
+
+<TipCallout type="tip" title="Why two Sets?">
+  They could be merged into one Set with two fields. We split them so **you see how data flows between nodes** — the first Set's output is literally the second Set's input. This chain is n8n's core gameplay.
+</TipCallout>
+
+<TipCallout type="warn" title="Expression editor disappeared?">
+  If you clicked `fx` but don't see a code box, you're already in expression mode — the input just looks different (pink background, "Expression" label). Click `fx` again to toggle back.
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Attach a third node after Compose message that sends to Slack / Telegram / a Webhook. Now you have a **minimal but complete** "trigger → process → notify" chain.
+</TipCallout>
+
+## Section recap
+
+- A workflow = trigger + processing nodes + (optional) output node
+- `$json` references the previous node's output JSON
+- Expression `{{ ... }}` only evaluates in expression mode
+- "Test workflow" runs it manually
+- Green checkmark = step succeeded
+
+Next: a deep dive on how data flows — [Item mental model](../mental-model/).

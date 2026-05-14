@@ -1,0 +1,127 @@
+---
+title: 核心心智模型 · Item / JSON / 迭代
+description: 听懂"n8n 在做什么"必须先建立的三件套思维
+sidebar:
+  order: 5
+  label: 1.4 心智模型
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 1 章 · 第 4 节</span>
+
+本节是 n8n 学习者**最容易忽视、却最关键**的一节。理解这里讲的三件套——**Item / JSON / 迭代**——之后你看任何 workflow 都能"读懂它在做什么"。
+
+## 一句话总结
+
+> **n8n 里的数据，永远是"一个由 JSON 对象组成的数组"——每个对象叫一个 Item，每个节点对数组里的每一个 Item 各自执行一次。**
+
+这一句话密度有点大，我们拆开看。
+
+## Item 是什么
+
+打开任意一个执行过的节点，看它的输出 tab，你会看到类似这样的结构：
+
+<TerminalCell filename="node-output.json" runTag="📤">
+{`[`}{`\n`}
+{`  { "name": "Alice", "age": 30 },`}{`\n`}
+{`  { "name": "Bob",   "age": 25 },`}{`\n`}
+{`  { "name": "Carol", "age": 28 }`}{`\n`}
+{`]`}
+</TerminalCell>
+
+**整体**是一个数组（`[...]`）——这是 n8n 数据的"标准包装"。  
+**每个元素**是一个对象（`{...}`）——这就是一个 **Item**。
+
+上面这个节点的输出有 **3 个 Items**。
+
+## 节点会"对每个 Item 跑一遍"
+
+最关键的一点：**下一个节点接到这个数组后，默认会对数组里的每一项各自执行一次**。
+
+举个例子，如果下一个节点是 "HTTP Request"（去 API 查这个人），它会**发 3 次请求**：
+
+<TerminalCell filename="iteration.txt" runTag="🔄">
+<span class="t-comment"># HTTP Request 节点 · URL 配置为 .../users/{'{{ $json.name }}'}</span>{`\n\n`}
+<span class="t-prompt">▶ run 1:</span> GET /users/Alice  → {`{`} ... {`}`}{`\n`}
+<span class="t-prompt">▶ run 2:</span> GET /users/Bob    → {`{`} ... {`}`}{`\n`}
+<span class="t-prompt">▶ run 3:</span> GET /users/Carol  → {`{`} ... {`}`}{`\n\n`}
+<span class="t-success">→ 输出：仍是 3 个 Items 的数组</span>
+</TerminalCell>
+
+这是 n8n 跟传统编程**最大的区别**：你不需要写 `for` 循环——节点自动迭代。
+
+## $json 是 "当前正在处理的那个 Item"
+
+回到刚才的 `{{ $json.name }}`。这个表达式在节点对每个 Item 处理时，`$json` 自动变成那个 Item 的内容：
+
+| 迭代第几次 | `$json` 是 | `$json.name` 求值为 |
+|---|---|---|
+| 第 1 次 | `{ "name": "Alice", "age": 30 }` | `"Alice"` |
+| 第 2 次 | `{ "name": "Bob", "age": 25 }` | `"Bob"` |
+| 第 3 次 | `{ "name": "Carol", "age": 28 }` | `"Carol"` |
+
+**这就是 n8n 表达式的灵魂**——`$json` 不是固定值，它跟着迭代变化。
+
+## 引用"上一个节点"和"任意节点"
+
+`$json` 只引用**正前方**节点。如果你想引用更早的节点，用 `$('NodeName')`：
+
+<TerminalCell filename="references.txt" runTag="🔍">
+<span class="t-comment"># 引用最近一个节点（默认）</span>{`\n`}
+{'{{ $json.name }}'}{`\n\n`}
+<span class="t-comment"># 引用名为 "Get Users" 的节点</span>{`\n`}
+{'{{ $(\'Get Users\').item.json.name }}'}{`\n\n`}
+<span class="t-comment"># 引用 "Get Users" 的**所有** items</span>{`\n`}
+{'{{ $(\'Get Users\').all() }}'}{`\n\n`}
+<span class="t-comment"># 引用 "Get Users" 的第一个 item</span>{`\n`}
+{'{{ $(\'Get Users\').first().json.name }}'}
+</TerminalCell>
+
+这套引用语法在第 3 部分会展开讲。这里先有个概念就行。
+
+## 单 Item 还是多 Item？
+
+不是所有节点都输出多 Item。比如：
+
+- **Manual Trigger** → 永远输出 **1 个空 Item**（`[{}]`）
+- **HTTP Request** GET 单个资源 → **1 个 Item**
+- **Google Sheets** 读 100 行 → **100 个 Items**
+- **Webhook** 收到一次请求 → **1 个 Item**
+
+**你的工作流逻辑**通常是：先从某处拿"一堆 Items"，然后让后续节点对每个迭代处理。
+
+<TipCallout type="warn" title="新手最大的坑 · `.item` vs `.first()`">
+  `$('NodeName').item` 是个**特殊变量**——它指"当前迭代对应的那个节点的 item"。这要求 n8n 能"对齐"两个节点的迭代——不是所有场景都对得齐！如果不确定，用 `$('NodeName').first().json.x` 更稳。第 3 部分会专门讲这个坑。
+</TipCallout>
+
+## 演示：两节点流水
+
+设想一个真实场景：
+
+<TerminalCell filename="real-flow.txt" runTag="📊">
+<span class="t-keyword">Node A · Google Sheets:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// 读出一张 "客户" 表 → 输出 50 个 Items</span>{`\n`}
+&nbsp;&nbsp;<span class="t-success">[{`{`} "email": "a@x.com", "name": "Alice" {`}`}, ... 49 more]</span>{`\n\n`}
+<span class="t-keyword">Node B · Send Email:</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// To 字段：{'{{ $json.email }}'}</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// Subject 字段：Hello {'{{ $json.name }}'}</span>{`\n`}
+&nbsp;&nbsp;<span class="t-prompt">▶ 自动发送 50 次邮件</span>
+</TerminalCell>
+
+**你没写一行循环代码**——50 个 Items 自动让 Node B 跑了 50 次。这就是 n8n 的核心抽象魅力。
+
+<TipCallout type="quest" title="扩展挑战">
+  打开你装好的 n8n，把第 1.3 节的 Hello World 改造一下：让 Set 节点输出 **3 个 Items**（不是 1 个），然后看 Compose Message 节点的输出有几个 Item。
+</TipCallout>
+
+## 本节要点回顾
+
+- n8n 数据 = **JSON 对象数组**，每个对象是一个 **Item**
+- 节点默认 **对每个 Item 各自执行一次**（自动迭代）
+- `$json` 指代"当前正在处理的那个 Item"
+- 引用其他节点：`$('NodeName').first().json.field`
+- 没有 `for` 循环——迭代是 n8n 的内建行为
+
+下一节聊聊**一次"执行"到底发生了什么** —— [Execution 机制](../execution/)。

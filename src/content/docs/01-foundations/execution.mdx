@@ -1,0 +1,124 @@
+---
+title: Execution 执行机制 · 一次运行发生了什么
+description: 看懂日志、用好 Pinned data、明白 Execution 是怎么算的
+sidebar:
+  order: 6
+  label: 1.5 Execution 机制
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 1 章 · 第 5 节</span>
+
+每次你点 "Test workflow" 或触发器自动启动，n8n 都会在内部跑一次**Execution**。理解 Execution 的生命周期，是你后续调试一切问题的基础。
+
+## Execution 是什么
+
+一次 Execution = **从触发开始，到所有分支跑完（或某个节点挂掉）为止的一整次运行记录**。
+
+每个 Execution 会被存到数据库里（Cloud / Docker / Desktop 都是），你随时能去**底部 Executions tab** 翻历史。
+
+<TerminalCell filename="execution-record.json" runTag="📜">
+<span class="t-comment"># 一条 Execution 记录包含的字段</span>{`\n`}
+{`{`}{`\n`}
+{`  "id": "abc123",`}{`\n`}
+{`  "startedAt": "2026-05-13T10:23:45Z",`}{`\n`}
+{`  "stoppedAt": "2026-05-13T10:23:47Z",`}{`\n`}
+{`  "mode": "manual",            `}<span class="t-comment">// 或 trigger / webhook / cli</span>{`\n`}
+{`  "finished": true,`}{`\n`}
+{`  "status": "success",          `}<span class="t-comment">// 或 error / running / canceled</span>{`\n`}
+{`  "workflowId": "wf-42",`}{`\n`}
+{`  "data": { /* 每个节点的输入输出 */ }`}{`\n`}
+{`}`}
+</TerminalCell>
+
+## 执行模式：3 种
+
+| 模式 | 什么时候用 | 特点 |
+|---|---|---|
+| **Manual**（手动） | 开发调试 | 必须打开编辑器，按 Test 按钮才跑 |
+| **Trigger**（自动） | 生产部署 | Workflow 处于 Active 状态，触发器满足条件就自动跑 |
+| **Webhook** | 外部系统调用 | 收到 HTTP 请求时跑，**只在 Active 状态下生效** |
+
+<TipCallout type="warn" title="新手最大的疑惑 · 为什么 Webhook 没反应？">
+  Webhook 节点在编辑器里**有两个 URL**：Test URL 和 Production URL。  
+  - **Test URL** 只在你打开了编辑器、且点了"Listen for test event"按钮后短暂生效  
+  - **Production URL** 在 workflow 处于 **Active 状态**后才生效  
+  
+  Active 开关在右上角。**这是新手 90% Webhook 不工作的原因**。
+</TipCallout>
+
+## Pinned Data：调试神器
+
+开发时你可能要反复试，每次都让真实数据流一遍很慢（比如 HTTP Request 调外部 API）。
+
+n8n 支持把任意节点的**当前输出"钉住"**——之后所有运行都用这份钉住的数据，不再真的调外部服务。
+
+操作：节点输出面板右上角 → "**Pin data**"。再次运行时该节点显示个"图钉"图标。
+
+<TerminalCell filename="pinned-data.txt" runTag="📌">
+<span class="t-comment"># 没钉住：每次都真的 GET 一次 GitHub</span>{`\n`}
+<span class="t-prompt">▶</span> HTTP Request → GET api.github.com/...  → 340ms{`\n\n`}
+<span class="t-comment"># 钉住后：直接用钉住的 JSON，0ms 跳过</span>{`\n`}
+<span class="t-prompt">📌</span> HTTP Request → (use pinned data) → 0ms{`\n\n`}
+<span class="t-success">→ 调试速度提升 100x，且不耗 API quota</span>
+</TerminalCell>
+
+记得**调通后取消 Pin**（同位置点 Unpin），不然生产环境也会用假数据。
+
+## 查日志：底部 Executions 面板
+
+每个节点跑完，点节点 → 输出 tab，能看到该节点在**最近一次** Execution 里的输入和输出。
+
+如果想看历史 Execution：
+
+- 底部 **Executions** tab → 列出最近 N 条
+- 点任意一条 → 用"幽灵模式"重现整个 workflow 的执行状态
+- 旁边的 **Retry** 按钮 → 拿这次的 input 数据重跑一次
+
+## 错误执行
+
+任何节点抛错 → 整个 Execution 状态为 `error` → 后续节点不再执行。
+
+错误节点在画布上会标**红色感叹号**。点它看 Errors tab 能看到错误信息。
+
+<TerminalCell filename="error-execution.txt" runTag="⚠">
+<span class="t-comment"># Slack 节点配错了 channel</span>{`\n`}
+<span style="color: #f85149;">✗ Slack: channel_not_found</span>{`\n`}
+&nbsp;&nbsp;<span class="t-comment">// upstream node 仍执行成功，下游不再执行</span>{`\n\n`}
+<span class="t-keyword">解决：</span>{`\n`}
+&nbsp;&nbsp;1. 看 Settings → "Continue On Fail" 开关{`\n`}
+&nbsp;&nbsp;2. 或加 Error Trigger 单独捕获错误（第 4 部分讲）
+</TerminalCell>
+
+## Execution 数据保留
+
+n8n 默认保留**所有** Execution 数据。日积月累数据库会膨胀。  
+生产环境记得配 `EXECUTIONS_DATA_PRUNE_MAX_COUNT`（保留多少条）或 `EXECUTIONS_DATA_MAX_AGE`（保留多久）。
+
+<TerminalCell filename="prune-config.env" runTag="🧹">
+<span class="t-comment"># Docker 环境变量示例</span>{`\n`}
+<span class="t-keyword">EXECUTIONS_DATA_PRUNE</span>=true{`\n`}
+<span class="t-keyword">EXECUTIONS_DATA_MAX_AGE</span>=336        <span class="t-comment"># 14 天（小时单位）</span>{`\n`}
+<span class="t-keyword">EXECUTIONS_DATA_PRUNE_MAX_COUNT</span>=10000   <span class="t-comment"># 最多保留 1 万条</span>
+</TerminalCell>
+
+<TipCallout type="tip" title="试一下 · 看自己的 Executions">
+  打开 n8n → 任意 workflow → 底部点 **Executions** → 看历史。即便是 Hello World 也已经有几条记录了——每次点 Test 都产生一条。
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  把 1.3 节的 Hello World 工作流**激活**（右上角 Active 开关），但因为它的触发器是 Manual——什么也不会发生。然后**改触发器为 Schedule（每分钟）**，再观察 Executions 是不是真的每分钟自动加一条。
+</TipCallout>
+
+## 本节要点回顾
+
+- 一次运行 = 一次 Execution，每条都被记录
+- 三种模式：Manual / Trigger / Webhook
+- **Active 开关**决定触发器是否在后台生效
+- **Pin data** 是调试神器，但调通后记得 Unpin
+- 错误后下游不执行，可通过 Continue On Fail 或 Error Trigger 处理（第 4 部分）
+- 生产记得配 Execution 数据清理策略
+
+至此你已学完 **第 1 部分**。下一部分我们开始**学节点**——从最重要的[触发器全景](../../02-nodes/triggers/)开始。
