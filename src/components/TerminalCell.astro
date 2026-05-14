@@ -1,0 +1,54 @@
+---
+/**
+ * TerminalCell · 编辑部正文中的"实验 cell"容器
+ *
+ * Props:
+ *   filename     — cell 顶部显示的文件名（如 "02_http_request.ipynb"）
+ *   level        — 难度徽章（如 "Lv.1"），可选
+ *   runTag       — 顶栏前缀符号（默认 "▶ run"），可选
+ *   actionLabel  — 右上角操作按钮文字（如 "Copy JSON ↗"），可选
+ *   actionHref   — 操作按钮跳转链接，可选
+ *
+ * Usage in MDX:
+ *   <TerminalCell filename="02_http_request.ipynb" level="Lv.1">
+ *     <span class="t-prompt">▶</span> GET https://api.github.com/users/torvalds
+ *     <br/>
+ *     <span class="t-success">→ 200 OK · 340ms</span>
+ *   </TerminalCell>
+ */
+interface Props {
+  filename?: string;
+  level?: string;
+  runTag?: string;
+  actionLabel?: string;
+  actionHref?: string;
+}
+
+const {
+  filename,
+  level,
+  runTag = '▶',
+  actionLabel,
+  actionHref,
+} = Astro.props;
+
+const hasHeader = filename || level || actionLabel;
+---
+<div class="term-cell not-content">
+  {hasHeader && (
+    <div class="term-cell-header">
+      {runTag && <span class="term-runtag">{runTag}</span>}
+      {filename && <span class="term-filename">{filename}</span>}
+      {level && <span class="term-badge">{level}</span>}
+      <span class="term-spacer"></span>
+      {actionLabel && (
+        actionHref
+          ? <a class="term-action" href={actionHref} target="_blank" rel="noopener">{actionLabel}</a>
+          : <button class="term-action" type="button">{actionLabel}</button>
+      )}
+    </div>
+  )}
+  <div class="term-cell-body">
+    <slot />
+  </div>
+</div>

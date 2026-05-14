@@ -1,0 +1,31 @@
+---
+/**
+ * TipCallout · 三色提示块
+ *
+ * Props:
+ *   type   — 'tip' | 'warn' | 'quest'（默认 tip）
+ *   title  — 提示块标题文字（如 "新手提示"）
+ *
+ * Usage:
+ *   <TipCallout type="warn" title="新手提示">
+ *     URL 含变量时切到表达式模式。
+ *   </TipCallout>
+ */
+interface Props {
+  type?: 'tip' | 'warn' | 'quest';
+  title?: string;
+}
+
+const { type = 'tip', title } = Astro.props;
+
+const defaultTitle: Record<NonNullable<Props['type']>, string> = {
+  tip: '试一下',
+  warn: '新手提示',
+  quest: '扩展挑战',
+};
+const displayTitle = title ?? defaultTitle[type];
+---
+<aside class={`tip-callout tip-callout--${type} not-content`}>
+  <span class="tip-callout-title">{displayTitle}</span>
+  <slot />
+</aside>

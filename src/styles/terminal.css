@@ -1,0 +1,112 @@
+/* ============================================================
+   terminal.css · B 风格嵌入式实验 cell
+   出现在编辑部正文中的暗色"笔记本 cell"
+   始终深色，不随主题切换
+   ============================================================ */
+
+.term-cell {
+  --term-radius: 6px;
+  background: var(--term-bg);
+  color: var(--term-text);
+  border: 1px solid var(--term-border);
+  border-radius: var(--term-radius);
+  margin: 1.6rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.65;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(13, 17, 23, 0.18);
+}
+
+/* ----- 头部 meta bar ----- */
+.term-cell-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--term-bg-soft);
+  border-bottom: 1px solid var(--term-border);
+  font-size: 0.78rem;
+  color: var(--term-text-dim);
+  flex-wrap: wrap;
+}
+.term-cell-header .term-filename {
+  color: var(--term-keyword);
+  font-weight: 700;
+}
+.term-cell-header .term-runtag {
+  color: var(--term-prompt);
+}
+.term-cell-header .term-badge {
+  background: var(--term-keyword);
+  color: var(--term-bg);
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  letter-spacing: 0.04em;
+}
+.term-cell-header .term-spacer { flex: 1; }
+.term-cell-header .term-action {
+  cursor: pointer;
+  color: var(--term-link);
+  background: transparent;
+  border: 1px solid var(--term-border);
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  transition: all 0.15s ease;
+}
+.term-cell-header .term-action:hover {
+  border-color: var(--term-link);
+  background: rgba(121, 192, 255, 0.08);
+}
+
+/* ----- 主体 ----- */
+.term-cell-body {
+  padding: 0.85rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.term-cell-body code,
+.term-cell-body pre code {
+  background: transparent !important;
+  color: var(--term-text);
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: inherit;
+}
+.term-cell-body pre {
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+/* 颜色辅助类（写在 cell body 内的 span） */
+.t-prompt   { color: var(--term-prompt); }
+.t-keyword  { color: var(--term-keyword); }
+.t-link     { color: var(--term-link); cursor: pointer; }
+.t-comment  { color: var(--term-comment); font-style: italic; }
+.t-success  { color: var(--term-prompt); }
+.t-pink     { color: var(--term-pink); }
+
+/* ----- 让 Starlight 默认的 ExpressiveCode 代码块在 cell 内变得无缝 ----- */
+.term-cell .expressive-code,
+.term-cell pre.shiki,
+.term-cell .frame {
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ----- Workflow Viewer 容器（在 cell 内时降亮度） ----- */
+.term-cell .workflow-viewer {
+  background: var(--term-bg);
+  border-radius: 4px;
+  min-height: 320px;
+}

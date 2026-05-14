@@ -1,0 +1,66 @@
+{
+  "name": "Hello HTTP",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "hours", "hoursInterval": 6 }
+          ]
+        }
+      },
+      "id": "node-schedule",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/users/torvalds",
+        "options": {}
+      },
+      "id": "node-http",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "summary", "value": "={{ $json.name }} · {{ $json.public_repos }} repos" }
+          ]
+        }
+      },
+      "id": "node-set",
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#dev",
+        "text": "={{ $json.summary }}"
+      },
+      "id": "node-slack",
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1080, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[ { "node": "HTTP Request", "type": "main", "index": 0 } ]]
+    },
+    "HTTP Request": {
+      "main": [[ { "node": "Set", "type": "main", "index": 0 } ]]
+    },
+    "Set": {
+      "main": [[ { "node": "Slack", "type": "main", "index": 0 } ]]
+    }
+  }
+}

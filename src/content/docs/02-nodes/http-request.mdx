@@ -1,0 +1,92 @@
+---
+title: HTTP Request · 万能 API 调用器
+description: 学会用 HTTP Request 节点，等于打开了 n8n 与外部世界对话的大门
+sidebar:
+  order: 2
+  label: HTTP Request 节点
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../components/WorkflowViewer.tsx';
+import workflow from '../../../workflows/hello-http.json';
+
+<span class="editorial-label">第 2 章 · 第 2 节</span>
+
+如果说 n8n 是一座城市，**HTTP Request** 节点就是它的高速公路入口——任何提供 API 的服务（哪怕官方没出"应用节点"），都可以通过它抵达你的工作流。这个节点是新手通往"高级玩家"的第一道门槛，本节我们打开它。
+
+## 它能做什么
+
+简单一句话：**发起 HTTP 请求，拿到响应，把响应交给下一个节点处理。** 听起来朴素，但 90% 的"我想接入 XX 服务"的需求，最终都落到了 HTTP Request 上。
+
+它的核心参数其实只有三个：
+
+1. **Method**（HTTP 方法）—— GET / POST / PUT / DELETE / PATCH
+2. **URL**（请求地址）—— 支持表达式插值，如 `https://api.example.com/users/{{ $json.id }}`
+3. **Authentication**（鉴权方式）—— None / Basic / Header / OAuth2 / Predefined credential
+
+掌握这三个，剩下的就是细节。
+
+## 第一个例子：查一个 GitHub 用户
+
+让我们立刻动手。下面这段终端 cell 模拟了运行结果——你不需要装任何东西，先看一眼输出长什么样。
+
+<TerminalCell filename="02_http_request.ipynb" level="Lv.1" runTag="▶ run">
+<span class="t-comment"># GET 一个公开 API · GitHub 用户信息</span>{`\n`}
+<span class="t-prompt">▶</span> GET https://api.github.com/users/torvalds{`\n\n`}
+<span class="t-success">→ 200 OK · 1.2 KB · 340 ms</span>{`\n`}
+{`{`}{`\n`}
+{`  "login": "torvalds",`}{`\n`}
+{`  "name": "Linus Torvalds",`}{`\n`}
+{`  "public_repos": 7,`}{`\n`}
+{`  "followers": 234567`}{`\n`}
+{`}`}
+</TerminalCell>
+
+请求成功了。`200 OK` 表示服务器接受了你的请求，返回的 JSON 就是这个用户的公开信息。下一步我们要把它**接到一个完整的工作流里**。
+
+## 把它接到工作流里
+
+下面这个工作流的意思是：**每 6 小时检查一次 Linus 的 GitHub 资料，提炼成一句话，发到 Slack 频道**。  
+你可以用鼠标拖动下面的画布看清楚每个节点。
+
+<TerminalCell filename="hello-http.workflow.json" level="Demo" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+整条链路只有 4 个节点，但已经覆盖了 n8n 最经典的模式：**Trigger → Fetch → Transform → Notify**。
+
+<TipCallout type="warn" title="新手提示 · URL 中的变量">
+  URL 含变量（比如用户 ID 来自上一个节点）时，要切到**表达式模式**——把鼠标悬停在 URL 输入框上，会出现"fx"小按钮，点它进入。直接把 `{{ $json.id }}` 写在普通模式下，n8n 会当成字面量。
+</TipCallout>
+
+## 复制并自己跑一遍
+
+把下面 cell 里的 JSON 复制下来，到你的 n8n 里：**画布右键 → Paste**（或菜单 → Import from File / Import from URL），就能直接看到刚才那个工作流。把 Slack 节点换成你的真实凭证就能跑。
+
+<TerminalCell filename="hello-http.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+{`\n`}<span class="t-comment"># 包含 4 个节点：Schedule Trigger → HTTP Request → Set → Slack</span>
+</TerminalCell>
+
+## 三个常见鉴权姿势
+
+| 场景 | Authentication 选项 | 示例 |
+|---|---|---|
+| 公开 API（如 GitHub 公开数据） | None | 上面的例子 |
+| API Key 走请求头 | Header Auth | `Authorization: Bearer xxx` |
+| 第三方 OAuth2 | OAuth2 API / Predefined | Google API、Twitter API、Notion 等 |
+
+<TipCallout type="quest" title="扩展挑战">
+  把上面的工作流改造一下：**让它在 followers 数变化时才发 Slack 通知**。提示——你需要一个 IF 节点和把"上次的 followers 数"存在某个地方（n8n Static Data、Airtable、或简单文件）。这个挑战会在第 4 部分讲清楚。
+</TipCallout>
+
+## 本节要点回顾
+
+- HTTP Request 是 n8n 的"万能节点"，三个核心参数：Method / URL / Authentication
+- URL 中用变量时记得切表达式模式
+- 鉴权三件套：None / Header / OAuth2 覆盖 95% 场景
+- 经典工作流模式：**Trigger → Fetch → Transform → Notify**
+
+下一节我们去看 [Set 节点](/02-nodes/)——HTTP Request 拿回的"原始数据"通常要先"塑形"，才能交给下游节点处理。

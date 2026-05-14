@@ -1,0 +1,32 @@
+---
+title: The n8n Book
+description: A bilingual n8n textbook · from zero to mastery in real-world workflow design
+template: splash
+hero:
+  tagline: An n8n textbook you can read, search, and run
+  actions:
+    - text: Start Reading
+      link: /en/00-welcome/intro/
+      icon: right-arrow
+      variant: primary
+    - text: Jump to Case Library
+      link: /en/00-welcome/intro/
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <Card title="📚 Structured Course">
+    7 parts, from install to AI Agents. Every lesson features callouts, pitfall warnings, and hands-on cells.
+  </Card>
+  <Card title="🛠 24 Real-World Cases">
+    Interactive node-link previews. One-click copy of Workflow JSON to import into your own n8n.
+  </Card>
+  <Card title="🌐 Bilingual">
+    English and Chinese kept in sync. Switch in the top-right anytime.
+  </Card>
+  <Card title="🔍 Instant Search">
+    `Cmd + K` / `Ctrl + K` full-text search. Three reference tables: nodes, expressions, glossary.
+  </Card>
+</CardGrid>

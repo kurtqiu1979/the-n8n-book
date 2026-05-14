@@ -1,0 +1,169 @@
+/* ============================================================
+   editorial.css · 编辑部主版式
+   将 Starlight 默认变量映射到 The n8n Book 的编辑部色板/字体
+   ============================================================ */
+
+/* ---------- Starlight 主题变量覆盖 · 浅色 ---------- */
+:root[data-theme='light'] {
+  --sl-color-bg:            var(--editorial-bg);
+  --sl-color-bg-nav:        var(--editorial-bg);
+  --sl-color-bg-sidebar:    var(--editorial-bg);
+  --sl-color-bg-inline-code: var(--editorial-bg-soft);
+  --sl-color-text:          var(--editorial-text);
+  --sl-color-text-accent:   var(--editorial-accent);
+  --sl-color-accent:        var(--editorial-accent);
+  --sl-color-accent-low:    var(--editorial-bg-soft);
+  --sl-color-accent-high:   var(--editorial-text);
+  --sl-color-white:         var(--editorial-text);
+  --sl-color-gray-1:        var(--editorial-text);
+  --sl-color-gray-2:        var(--editorial-text-muted);
+  --sl-color-gray-3:        var(--editorial-text-muted);
+  --sl-color-gray-4:        var(--editorial-rule);
+  --sl-color-gray-5:        var(--editorial-rule);
+  --sl-color-gray-6:        var(--editorial-bg-soft);
+  --sl-color-gray-7:        var(--editorial-bg);
+  --sl-color-hairline:      var(--editorial-rule);
+  --sl-color-hairline-light: var(--editorial-rule);
+}
+
+/* ---------- 深色模式（保留编辑部气质，但深焦底） ---------- */
+:root[data-theme='dark'] {
+  --sl-color-accent:        var(--editorial-accent-soft);
+  --sl-color-text-accent:   var(--editorial-accent-soft);
+}
+
+/* ---------- 字体 ---------- */
+:root {
+  --sl-font:        var(--font-sans);
+  --sl-font-mono:   var(--font-mono);
+}
+
+/* 正文使用衬线，凸显编辑部气质 */
+.sl-markdown-content {
+  font-family: var(--font-serif);
+  line-height: var(--leading-prose);
+  font-size: 1.0625rem;   /* 17px */
+}
+
+/* UI chrome (导航/侧栏) 使用 sans，区别于正文 */
+header, nav, aside,
+.sidebar-content, .right-sidebar {
+  font-family: var(--font-sans) !important;
+}
+
+/* ---------- 标题排版（衬线 + 紧凑行高） ---------- */
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4 {
+  font-family: var(--font-serif);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+}
+.sl-markdown-content h1 { font-size: 2.4rem; font-weight: 700; margin-top: 0; }
+.sl-markdown-content h2 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  margin-top: 2.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--editorial-rule);
+}
+.sl-markdown-content h3 { font-size: 1.3rem; font-weight: 700; margin-top: 1.8rem; }
+.sl-markdown-content h4 { font-size: 1.1rem; font-weight: 700; }
+
+/* ---------- 章节/小节超小型 Label ---------- */
+.editorial-label {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--editorial-accent);
+  margin-bottom: 0.3rem;
+}
+
+/* ---------- 段首下沉字（drop cap） ---------- */
+.sl-markdown-content > p:first-of-type::first-letter {
+  font-family: var(--font-serif);
+  float: left;
+  font-size: 3.4rem;
+  line-height: 0.9;
+  padding-right: 0.4rem;
+  padding-top: 0.3rem;
+  font-weight: 700;
+  color: var(--editorial-accent);
+}
+/* 在 starlight 标题之后第一段才下沉 · 防止在 hero / page meta 区错位 */
+.sl-markdown-content > h1 + p::first-letter,
+.sl-markdown-content > h2 + p::first-letter { all: unset; }
+
+/* ---------- 引用块（Editorial Pullquote） ---------- */
+.sl-markdown-content blockquote {
+  border-left: 3px solid var(--editorial-accent);
+  background: var(--editorial-bg-soft);
+  font-style: italic;
+  padding: 0.9rem 1.2rem;
+  margin: 1.4rem 0;
+  font-family: var(--font-serif);
+  color: var(--editorial-text-muted);
+}
+
+/* ---------- 内联代码（与正文衬线协调） ---------- */
+.sl-markdown-content :not(pre) > code {
+  background: var(--editorial-bg-soft);
+  color: var(--editorial-accent);
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* ---------- 表格 ---------- */
+.sl-markdown-content table {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+}
+
+/* ---------- 阅读区最大宽度（让正文更书页化） ---------- */
+.sl-container .main-pane .main-frame {
+  /* Starlight 自带主区域宽度；此处微调 */
+}
+
+/* ---------- TipCallout 三色提示块 ---------- */
+.tip-callout {
+  margin: 1.4rem 0;
+  padding: 0.85rem 1.1rem 0.85rem 3rem;
+  border-radius: 4px;
+  border-left: 3px solid;
+  position: relative;
+  font-family: var(--font-serif);
+  font-size: 0.98rem;
+  line-height: 1.7;
+  background: var(--editorial-bg-soft);
+}
+.tip-callout::before {
+  position: absolute;
+  left: 0.9rem;
+  top: 0.85rem;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.tip-callout-title {
+  display: block;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+.tip-callout--tip       { border-left-color: var(--editorial-callout-tip); }
+.tip-callout--tip::before    { content: '💡'; }
+.tip-callout--tip .tip-callout-title { color: var(--editorial-callout-tip); }
+.tip-callout--warn      { border-left-color: var(--editorial-callout-warn); }
+.tip-callout--warn::before   { content: '⚠️'; }
+.tip-callout--warn .tip-callout-title { color: var(--editorial-callout-warn); }
+.tip-callout--quest     { border-left-color: var(--editorial-callout-quest); }
+.tip-callout--quest::before  { content: '🎯'; }
+.tip-callout--quest .tip-callout-title { color: var(--editorial-callout-quest); }

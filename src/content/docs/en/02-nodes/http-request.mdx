@@ -1,0 +1,92 @@
+---
+title: HTTP Request · The Universal API Caller
+description: Master the HTTP Request node and you've opened n8n's door to the outside world
+sidebar:
+  order: 2
+  label: HTTP Request Node
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/hello-http.json';
+
+<span class="editorial-label">Chapter 2 · Section 2</span>
+
+If n8n is a city, the **HTTP Request** node is its highway on-ramp — any service that exposes an API (even if there's no official "app node" for it) can be reached from your workflow through this node. It's the first gate from beginner to "power user", and we're opening it now.
+
+## What it does
+
+In one line: **send an HTTP request, get a response, hand the response to the next node.** Sounds humble — but 90% of "how do I integrate XYZ service" ends up at HTTP Request.
+
+It has just three core parameters:
+
+1. **Method** — GET / POST / PUT / DELETE / PATCH
+2. **URL** — supports expression interpolation, e.g. `https://api.example.com/users/{{ $json.id }}`
+3. **Authentication** — None / Basic / Header / OAuth2 / Predefined credential
+
+Master these three; the rest is detail.
+
+## First example: look up a GitHub user
+
+Let's get hands-on. The terminal cell below simulates a real run — you don't need anything installed yet, just look at the output.
+
+<TerminalCell filename="02_http_request.ipynb" level="Lv.1" runTag="▶ run">
+<span class="t-comment"># GET a public API · GitHub user info</span>{`\n`}
+<span class="t-prompt">▶</span> GET https://api.github.com/users/torvalds{`\n\n`}
+<span class="t-success">→ 200 OK · 1.2 KB · 340 ms</span>{`\n`}
+{`{`}{`\n`}
+{`  "login": "torvalds",`}{`\n`}
+{`  "name": "Linus Torvalds",`}{`\n`}
+{`  "public_repos": 7,`}{`\n`}
+{`  "followers": 234567`}{`\n`}
+{`}`}
+</TerminalCell>
+
+`200 OK` means the server accepted our request; the returned JSON is the user's public profile. Next step: **wire it into a complete workflow**.
+
+## Put it in a workflow
+
+This workflow says: **every 6 hours, fetch Linus's GitHub profile, turn it into a one-liner, post to a Slack channel.**  
+Pan the canvas below to see each node clearly.
+
+<TerminalCell filename="hello-http.workflow.json" level="Demo" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+Just four nodes — but they cover n8n's most classic pattern: **Trigger → Fetch → Transform → Notify**.
+
+<TipCallout type="warn" title="Beginner pitfall · variables in URLs">
+  When your URL contains a variable (e.g. user ID from the previous node), you must switch the URL field to **expression mode** — hover over the URL input and click the "fx" button. Writing `{{ $json.id }}` in plain text mode makes n8n treat it as a literal string.
+</TipCallout>
+
+## Copy and run it yourself
+
+Copy the JSON below; in your n8n: **right-click the canvas → Paste** (or menu → Import from File / URL). You'll see this exact workflow. Swap the Slack credentials for your own and it runs.
+
+<TerminalCell filename="hello-http.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+{`\n`}<span class="t-comment"># 4 nodes: Schedule Trigger → HTTP Request → Set → Slack</span>
+</TerminalCell>
+
+## Three common authentication patterns
+
+| Scenario | Authentication | Example |
+|---|---|---|
+| Public API (e.g. GitHub public data) | None | The example above |
+| API Key in header | Header Auth | `Authorization: Bearer xxx` |
+| Third-party OAuth2 | OAuth2 API / Predefined | Google, Twitter, Notion, etc. |
+
+<TipCallout type="quest" title="Extension challenge">
+  Modify the workflow: **only post to Slack when followers count actually changes**. Hint — you need an IF node, plus a way to remember the previous followers count (n8n Static Data, Airtable, or a simple file). We'll cover this pattern in Part 4.
+</TipCallout>
+
+## Section recap
+
+- HTTP Request is n8n's universal node — three core params: Method / URL / Authentication
+- Switch to expression mode whenever variables appear in the URL
+- Authentication trio — None / Header / OAuth2 — covers 95% of cases
+- Classic workflow pattern: **Trigger → Fetch → Transform → Notify**
+
+Next up: the [Set node](/en/02-nodes/) — HTTP Request usually returns raw data that needs "reshaping" before downstream nodes can use it.
