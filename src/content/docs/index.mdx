@@ -4,17 +4,16 @@ description: 从零基础到独立设计复杂工作流 · 一份中英双语的
 template: splash
 hero:
   tagline: 一本读得下去、查得到、动得了手的 n8n 教程
-  actions:
-    - text: 开始阅读
-      link: /00-welcome/intro/
-      icon: right-arrow
-      variant: primary
-    - text: 直达案例库
-      link: /00-welcome/intro/
-      icon: external
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+
+export const base = import.meta.env.BASE_URL;
+
+<div class="hero-actions">
+  <LinkButton href={`${base}00-welcome/intro/`} variant="primary" icon="right-arrow">开始阅读</LinkButton>
+  <LinkButton href={`${base}02-nodes/http-request/`} variant="secondary" icon="external">看个示例课</LinkButton>
+</div>
 
 <CardGrid>
   <Card title="📚 体系化课程" >

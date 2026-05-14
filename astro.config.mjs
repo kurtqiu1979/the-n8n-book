@@ -9,7 +9,8 @@ import react from '@astrojs/react';
  *   - GitHub Pages 子路径 (kurtqiu1979.github.io/the-n8n-book/) → base 必须 = /the-n8n-book
  * 通过 SITE_BASE 环境变量切换，避免硬编码。
  */
-const BASE = process.env.SITE_BASE || '/';
+const rawBase = process.env.SITE_BASE || '/';
+const BASE = rawBase.endsWith('/') ? rawBase : rawBase + '/';
 
 // https://astro.build/config
 export default defineConfig({

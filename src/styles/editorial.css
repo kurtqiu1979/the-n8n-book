@@ -130,6 +130,15 @@ header, nav, aside,
   /* Starlight 自带主区域宽度；此处微调 */
 }
 
+/* ---------- Splash 首页 hero 按钮组 ---------- */
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin: 1.2rem 0 2.4rem;
+}
+
 /* ---------- TipCallout 三色提示块 ---------- */
 .tip-callout {
   margin: 1.4rem 0;

@@ -4,17 +4,16 @@ description: A bilingual n8n textbook · from zero to mastery in real-world work
 template: splash
 hero:
   tagline: An n8n textbook you can read, search, and run
-  actions:
-    - text: Start Reading
-      link: /en/00-welcome/intro/
-      icon: right-arrow
-      variant: primary
-    - text: Jump to Case Library
-      link: /en/00-welcome/intro/
-      icon: external
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+
+export const base = import.meta.env.BASE_URL;
+
+<div class="hero-actions">
+  <LinkButton href={`${base}en/00-welcome/intro/`} variant="primary" icon="right-arrow">Start Reading</LinkButton>
+  <LinkButton href={`${base}en/02-nodes/http-request/`} variant="secondary" icon="external">See a Sample Lesson</LinkButton>
+</div>
 
 <CardGrid>
   <Card title="📚 Structured Course">
