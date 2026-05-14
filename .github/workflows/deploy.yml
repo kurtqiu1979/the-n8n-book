@@ -35,6 +35,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build site
+        # SITE_BASE 用于子路径部署到 kurtqiu1979.github.io/the-n8n-book/
+        # 当自定义域名 n8nworker.xyz DNS 生效并被 GitHub Pages 接管后，
+        # 删掉下面的 env 块（保留 run: pnpm build 即可）
+        env:
+          SITE_BASE: /the-n8n-book
         run: pnpm build
 
       - name: Upload artifact

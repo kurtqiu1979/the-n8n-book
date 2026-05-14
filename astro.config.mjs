@@ -3,9 +3,18 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import react from '@astrojs/react';
 
+/**
+ * 部署路径处理：
+ *   - 自定义域名 (n8nworker.xyz) → 根路径 `/`，不需要 base
+ *   - GitHub Pages 子路径 (kurtqiu1979.github.io/the-n8n-book/) → base 必须 = /the-n8n-book
+ * 通过 SITE_BASE 环境变量切换，避免硬编码。
+ */
+const BASE = process.env.SITE_BASE || '/';
+
 // https://astro.build/config
 export default defineConfig({
   site: 'https://n8nworker.xyz',
+  base: BASE,
   integrations: [
     starlight({
       title: 'The n8n Book',
