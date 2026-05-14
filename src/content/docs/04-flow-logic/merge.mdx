@@ -1,0 +1,166 @@
+---
+title: Merge 节点 · 4 种合流模式图解
+description: IF 分流后怎么合回来 —— Append / Combine / Merge By Index 三招用法
+sidebar:
+  order: 3
+  label: 4.2 Merge 详解
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 4 章 · 第 2 节</span>
+
+Merge 是新手翻车率最高的节点之一——光"合并"两个字背后藏着 5 种不同语义。这一节把每种模式的**输入 → 输出**画清楚，看完不再踩坑。
+
+## Merge 节点的两个输入
+
+每个 Merge 节点有 **Input 1** 和 **Input 2** 两个端口，分别接两个上游：
+
+<TerminalCell filename="merge-shape.txt" runTag="🔀">
+{`[Source A] ──→ Input 1 ┐
+                       │── Merge ──→ output
+[Source B] ──→ Input 2 ┘`}
+</TerminalCell>
+
+输出长什么样**完全取决于你选哪种 mode**。
+
+## 模式 1 · Append（最常用、最直观）
+
+把 Input 2 的 items 接到 Input 1 后面。**1+1 → 2**。
+
+<TerminalCell filename="merge-append.txt" runTag="➕">
+{`Input 1:  [ {a:1}, {a:2} ]
+Input 2:  [ {b:3}, {b:4} ]
+
+Mode: Append
+
+Output:   [ {a:1}, {a:2}, {b:3}, {b:4} ]
+         ────────────  ────────────
+         来自 Input 1     来自 Input 2`}
+</TerminalCell>
+
+**适合场景：** 两条分支跑完后简单汇总（如"无论 VIP 还是免费用户都要邮件通知"）。
+
+## 模式 2 · Combine by Position（按位置配对）
+
+第 1 个跟第 1 个配对，第 2 个跟第 2 个配对……合并成新对象。
+
+<TerminalCell filename="merge-position.txt" runTag="🧩">
+{`Input 1:  [ {name:"Alice"}, {name:"Bob"}, {name:"Carol"} ]
+Input 2:  [ {age:30},        {age:25},      {age:28} ]
+
+Mode: Combine → By Position
+
+Output:   [ {name:"Alice", age:30}, {name:"Bob", age:25}, {name:"Carol", age:28} ]`}
+</TerminalCell>
+
+**适合场景：** 两个来源数据一一对应（如先并行查"用户信息"和"用户余额"，再合并）。
+
+**⚠ 注意**：要求两边 items 数量相同。不等长时缺的一边会用空值填补。
+
+## 模式 3 · Combine by Matching Fields（按字段匹配，类 SQL join）
+
+按某个字段的值配对（类似 SQL 的 INNER JOIN）。
+
+<TerminalCell filename="merge-fields.txt" runTag="🔗">
+{`Input 1:  [ {id:1, name:"Alice"}, {id:2, name:"Bob"} ]
+Input 2:  [ {id:1, age:30},        {id:3, age:99} ]
+
+Mode: Combine → By Matching Fields
+  Field from Input 1:  id
+  Field from Input 2:  id
+
+Output:   [ {id:1, name:"Alice", age:30} ]
+         ────────────────────────────────
+         只保留两边 id 都匹配的（INNER JOIN）
+
+Output mode 还有：
+  - Keep Unmatched From Input 1   (LEFT JOIN)
+  - Keep Unmatched From Both      (FULL JOIN)`}
+</TerminalCell>
+
+**适合场景：** 把两个有共同标识的数据集合并（如"用户表"和"订单表"按 user_id 关联）。
+
+## 模式 4 · Combine All（笛卡尔积）
+
+每个 Input 1 跟每个 Input 2 全配对——**1×N → 1*N**。
+
+<TerminalCell filename="merge-all.txt" runTag="✖">
+{`Input 1:  [ {a:1}, {a:2} ]
+Input 2:  [ {b:3}, {b:4} ]
+
+Mode: Combine → All
+
+Output:   [ {a:1, b:3}, {a:1, b:4}, {a:2, b:3}, {a:2, b:4} ]
+         共 2 × 2 = 4 条`}
+</TerminalCell>
+
+**适合场景：** 你确实需要"组合所有可能"的少数场景（如"3 个用户 × 5 个产品 → 15 条试发邮件"）。**慎用——数据量爆炸**。
+
+## 模式 5 · SQL Query（最灵活）
+
+直接用 SQL 写连接条件——内部用 SQLite 引擎跑。
+
+<TerminalCell filename="merge-sql.txt" runTag="🗄">
+{`Mode: SQL Query
+
+SQL:
+SELECT a.id, a.name, b.age, b.balance
+FROM input1 a
+LEFT JOIN input2 b ON a.id = b.user_id
+WHERE b.balance > 1000
+
+Output:   按 SQL 执行结果`}
+</TerminalCell>
+
+**适合场景：** 复杂联表查询，前面几种模式搞不定的。
+
+## Merge 决策树
+
+<TerminalCell filename="merge-decision.txt" runTag="🌳">
+{`Q1: 你想要怎样的输出？
+    
+    [全部 items 拼起来] ────→ Append
+    
+    [两边一一对应] ─────────→ Combine by Position
+    
+    [按某字段关联] ─────────→ Combine by Matching Fields
+    
+    [所有组合] ────────────→ Combine All  (谨慎)
+    
+    [需要 SQL 级灵活度] ──→ SQL Query`}
+</TerminalCell>
+
+## 常见坑
+
+<TipCallout type="warn" title="坑 1 · 用 Append 但其实需要 Combine by Position">
+  
+  你想把"用户基本信息 + 用户余额"合并，期望输出 5 个完整用户对象。但用了 Append → 输出 10 个 item（5 个只有基本信息，5 个只有余额）。
+  
+  **诊断**：看输出的 item 数。期望和实际不符 → 改 mode。
+  
+</TipCallout>
+
+<TipCallout type="warn" title="坑 2 · Combine by Matching Fields 时字段类型不一致">
+  
+  Input 1 的 `id` 是 number `123`，Input 2 的 `id` 是 string `"123"`——匹配失败（n8n 用严格比较）。
+  
+  **解药**：先用 Set 节点把两边统一成同类型。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  用两个 Manual Trigger 分别输出 5 个 items（一个含 name，一个含 age），用 Merge 节点的 **By Position** 把它们合并。然后改用 **Append** 看输出有什么不一样。
+</TipCallout>
+
+## 本节要点回顾
+
+- Merge 有 5 种 mode，**选错就翻车**
+- Append = 拼接（最常用）
+- Combine by Position = 一一对应
+- Combine by Matching Fields = SQL JOIN 思路
+- Combine All = 笛卡尔积（慎用）
+- SQL Query = 终极灵活
+
+下一节[SplitInBatches](../split-batches/)，反向操作——把大数组切成小批次。

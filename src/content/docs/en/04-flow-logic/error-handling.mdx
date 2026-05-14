@@ -1,0 +1,206 @@
+---
+title: Error Handling · The Three-Layer Stack
+description: Continue On Fail + Error Trigger + Error Workflow — so failures catch you, not surprise you
+sidebar:
+  order: 6
+  label: 4.5 Error Handling
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 4 · Section 5</span>
+
+Until now your workflows have been "happy paths" — a node fails, the whole thing stops. **Real production** always has surprises: API timeouts, missing fields, network blips. This section covers n8n's three-layer error-handling stack.
+
+## The three-layer stack
+
+<TerminalCell filename="error-trio.txt" runTag="🛡">
+{`Three layers:
+
+① Continue On Fail                  (node level · spot fix)
+   "This node failed — keep going downstream anyway."
+   
+② Error Trigger + branch            (workflow level · catch and route)
+   "The whole workflow failed — kick off a separate error path."
+   
+③ Error Workflow (global)            (account level · safety net)
+   "Any workflow fails — trigger a unified alert."`}
+</TerminalCell>
+
+Each layer has a different job. **Production-grade workflows usually configure all three.**
+
+## ① Continue On Fail (node level)
+
+Any node → **Settings** tab → toggle "**Continue On Fail**" (or "On Error" in newer versions).
+
+<TerminalCell filename="continue-on-fail.txt" runTag="🚧">
+{`Default behavior:
+  [HTTP Request] fails → entire workflow halts
+
+With Continue On Fail:
+  [HTTP Request] fails → outputs an error item → downstream proceeds
+  
+  Error item shape:
+  { "error": { "message": "Request timeout", ... } }`}
+</TerminalCell>
+
+Downstream can branch on the error:
+
+<TerminalCell filename="error-branching.txt" runTag="🚧">
+{`[HTTP Request (Continue On Fail)] → [IF ($json.error exists?)]
+                                          ├── True ──→ [Log Error]
+                                          └── False ─→ [Process Success]`}
+</TerminalCell>
+
+**When:** a single failure shouldn't halt batch processing (1/100 user fails — don't lose the other 99).
+
+## ② Error Trigger + branch
+
+Stronger pattern — an **independent trigger node** that fires only on failure.
+
+### Setup
+
+<TerminalCell filename="error-trigger-setup.txt" runTag="🪤">
+{`1. In the main workflow:
+   Settings → Error workflow → choose "this workflow"  
+   (or another dedicated error-handling workflow)
+
+2. Add an "Error Trigger" node to the canvas (no upstream input)
+   It only activates when the main flow fails
+
+3. Error Trigger output includes:
+   - $json.execution        (failed execution details)
+   - $json.workflow         (workflow meta)
+   - $json.execution.error  (error object)
+   
+4. Chain Slack / Email / custom logger to notify or record`}
+</TerminalCell>
+
+### How it flows
+
+<TerminalCell filename="error-trigger-flow.txt" runTag="🪤">
+{`Normal path (same canvas):
+  [Webhook] → [Process] → [Save to DB] → [Notify]
+  
+Error path (same canvas, separate entry):
+  [Error Trigger] → [Format Error] → [Send to Slack #alerts]
+                                          ↑
+                                          "fires on failure"`}
+</TerminalCell>
+
+**When:** you want notification for **any** node failure (not just one specific node).
+
+## ③ Error Workflow (global)
+
+A **dedicated workflow** that handles failures from *all* other workflows.
+
+### Configure
+
+<TerminalCell filename="global-error-wf.txt" runTag="🌐">
+{`1. Build a dedicated workflow, e.g. "Global Error Handler"
+   Entry = Error Trigger
+   Then: format error → Slack / Email / PagerDuty
+
+2. In every other workflow: Settings → Error workflow → "Global Error Handler"
+
+3. When any workflow fails, Global Error Handler auto-fires with
+   $json.workflow showing which one failed.`}
+</TerminalCell>
+
+### Recipe for a universal error formatter
+
+<TerminalCell filename="error-handler-recipe.txt" runTag="🌐">
+{`[Error Trigger]
+   ↓
+[Set] fields:
+   workflow_name = {{ $json.workflow.name }}
+   workflow_url  = https://your-n8n.com/workflow/{{ $json.workflow.id }}
+   error_msg     = {{ $json.execution.error.message }}
+   failed_node   = {{ $json.execution.error.node.name }}
+   ↓
+[Slack #alerts]
+   Channel:   #alerts
+   Message:   🚨 *{{ $json.workflow_name }}* failed
+              Node: {{ $json.failed_node }}
+              Error: {{ $json.error_msg }}
+              <{{ $json.workflow_url }}|Open in editor>`}
+</TerminalCell>
+
+## Advanced patterns
+
+### Stop and Error (deliberate failure)
+
+To "fail loud if invalid," use the **Stop and Error** node:
+
+<TerminalCell filename="stop-and-error.txt" runTag="🛑">
+{`[Webhook] → [IF (valid?)] ─ False ─→ [Stop and Error]
+                                         Error Message: "Invalid request: {{ $json.reason }}"`}
+</TerminalCell>
+
+Triggers the workflow into `error` state and fires the Error Workflow.
+
+### Retry On Fail (per-node retries)
+
+Node → Settings → "**Retry On Fail**" → enable → set retries and interval.
+
+<TerminalCell filename="retry-on-fail.txt" runTag="🔁">
+{`HTTP Request:
+  Retry On Fail:    true
+  Max Tries:        3
+  Wait Between:     2 seconds (with jitter)
+  
+Auto-retries 2 more times (3 total). Great for network blips.`}
+</TerminalCell>
+
+### Wait on Errors
+
+Some nodes (e.g. Wait) have an "On Error" option:
+- **Stop Workflow** (default)
+- **Continue (using error output)** — continue with the error data
+- **Continue Workflow** — continue, no error state
+
+## Decision tree
+
+<TerminalCell filename="error-decision.txt" runTag="🌳">
+{`Q: When this node fails, what should happen?
+    
+    [Halt immediately] ────────→ default (no config)
+    
+    [Keep going downstream] ───→ Node Settings → Continue On Fail
+    
+    [Try a few times silently] → Node Settings → Retry On Fail
+    
+    [Notify me of any failure] → Workflow Settings → Error workflow
+                                  + a global Error Trigger workflow
+    
+    [Fail loudly on bad data] ─→ Stop and Error node`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Top regret · 'I thought it'd notify me'">
+  
+  n8n **does not** notify you when workflows fail by default — it just leaves a red error in Executions. **Production environments must configure an Error Workflow** — without it, you're flying blind.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  
+  Build a "Global Error Handler" workflow:
+  
+  1. Entry = Error Trigger
+  2. Format error info as Markdown
+  3. Send to your Telegram / Slack / Discord
+  4. Set it as Error workflow on an existing workflow
+  5. Deliberately break that workflow (e.g. set a bad URL) — verify the notification fires
+  
+</TipCallout>
+
+## Section recap
+
+- Three layers: Continue On Fail (node) → Error Trigger (workflow) → Error Workflow (global)
+- Production workflows should at minimum configure an **Error Workflow**
+- Stop and Error: deliberate failure
+- Retry On Fail: automatic network-blip recovery
+- **n8n does NOT alert you by default** — you must configure it
+
+Next: [Sub-workflows](../sub-workflows/) — modularize reusable logic.

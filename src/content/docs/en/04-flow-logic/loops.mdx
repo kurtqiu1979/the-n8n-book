@@ -1,0 +1,161 @@
+---
+title: Loop Patterns · Five Ways to Iterate
+description: n8n has five distinct ways to "loop" — when to pick each
+sidebar:
+  order: 5
+  label: 4.4 Loop Patterns
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 4 · Section 4</span>
+
+n8n doesn't ship a single "Loop" node — confusing at first. In reality, there are **at least five distinct ways** to loop, each suited to a different scenario.
+
+## Pattern 1 · Default item iteration (most common)
+
+The natural "loop". Nodes run once per item — **you do nothing**, n8n handles it.
+
+<TerminalCell filename="default-loop.txt" runTag="🔁">
+{`[Get Sheets (100 rows)] ─→ [HTTP Request]
+
+n8n auto-runs HTTP Request 100 times, once per row.
+No explicit "for" — this is just n8n's default behavior.`}
+</TerminalCell>
+
+**When:** 90% of "do something per row" cases.
+
+## Pattern 2 · Loop Over Items (batched iteration)
+
+Covered in §4.3 — mostly for rate-limiting:
+
+<TerminalCell filename="loop-over-items.txt" runTag="📦">
+{`[1000 items] → Loop Over Items (size=50) → process → loop back`}
+</TerminalCell>
+
+**When:** rate-limit shields.
+
+## Pattern 3 · Code node `for` / `while`
+
+Inside Code, write actual JS — loop however you want:
+
+<TerminalCell filename="code-loop.txt" runTag="💻">
+{`// Code node JS:
+
+const results = [];
+for (const item of $input.all()) {
+  results.push({
+    json: {
+      original: item.json,
+      doubled: item.json.value * 2,
+    }
+  });
+}
+return results;
+
+// Or while
+let counter = 0;
+const out = [];
+while (counter < 10) {
+  out.push({ json: { i: counter } });
+  counter++;
+}
+return out;`}
+</TerminalCell>
+
+**When:** complex control flow (early break, nested loops, counters).
+
+## Pattern 4 · Self-trigger ("polling")
+
+Not real looping, but the effect is similar — the workflow re-triggers itself:
+
+<TerminalCell filename="self-trigger.txt" runTag="🔄">
+{`[Schedule (every 5 min)] → [Check Status] → [IF (not done?)] ──Yes── [Continue]
+                                                              └─ No ── [Stop]
+
+Each run does one small step. Long tasks span many runs.`}
+</TerminalCell>
+
+**When:** long-running tasks (polling external state until done).
+
+## Pattern 5 · Recursive sub-workflow
+
+Workflow A calls itself (or A → B → A), achieving recursion:
+
+<TerminalCell filename="recursive.txt" runTag="🌀">
+{`Workflow A:
+  receive input ─→ [IF (base case?)] ──Yes── return
+                              └─ No  ── [Execute Workflow A (smaller input)]
+
+Classic recursion. Use carefully — stack blow-up risk.`}
+</TerminalCell>
+
+**When:** tree traversal, divide-and-conquer. **Almost never in business workflows** — avoid if possible.
+
+## Comparison
+
+| Pattern | Pro | Con | When |
+|---|---|---|---|
+| Default iteration | Simplest | No break | 90% of cases |
+| Loop Over Items | Rate control | Slow (serial) | Rate-limit |
+| Code node | Most flexible | Need JS | Complex control |
+| Self-trigger | Spans long time | State juggling | Long polling |
+| Recursive sub-wf | Tree work | Stack risk | Rare |
+
+## When to loop and when NOT to
+
+Many beginners reach for a Code node with `for` — but default iteration usually suffices.
+
+<TerminalCell filename="loop-or-not.txt" runTag="💡">
+{`❌ Overkill:
+  [Get 5 Users] → [Code: for (u of items) { fetch... }]
+  
+✅ Just do:
+  [Get 5 Users] → [HTTP Request]  ← per-user auto-iteration
+
+❌ Wrong (trying to rate-limit inside Code):
+  [Code: for (let i = 0; i < 100; i++) { sleep(1000); fetch... }]
+  ↑ Don't sleep in Code — blocks the whole worker
+
+✅ Right:
+  [Loop Over Items (size=1) + Wait (1s) + HTTP Request]`}
+</TerminalCell>
+
+## Practical: paginated API
+
+Common "loop" scenario — fetch all pages.
+
+### Approach A · Loop Over Items (recommended)
+
+<TerminalCell filename="pagination-loop.txt" runTag="📄">
+{`[Manual Trigger] → [Set (page=1)] → [Loop Over Items] ──→ [HTTP GET /api/?page={{ $json.page }}]
+                                                              ↓
+                                                       [IF (has next?)] ── Yes ──→ [Set (page+1)] ──┘
+                                                                          └── No ──→ [Done]`}
+</TerminalCell>
+
+### Approach B · Recursive sub-workflow
+
+See Pattern 5. **Not recommended for beginners.**
+
+<TipCallout type="warn" title="Beginner mantra · 'Do I need a loop at all?'">
+  
+  Default iteration covers 80% of "loop" scenarios. **Try connecting nodes first** — if default iteration works, don't gild the lily. When you DO need a loop, **first choice is Loop Over Items**; Code node's explicit `for` is the last resort.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Build a paginated workflow: fetch from https://jsonplaceholder.typicode.com/posts, 10 per page, loop until done. Use Loop Over Items.
+</TipCallout>
+
+## Section recap
+
+- Default per-item iteration is n8n's most natural "loop"
+- Rate-limit → Loop Over Items
+- Complex control (break, nested) → Code node
+- Long polling → Self-trigger
+- Recursive sub-workflow rarely needed
+- Principle: **try default iteration first, upgrade only when needed**
+
+Next: [error handling](../error-handling/) — what happens when things break.

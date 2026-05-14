@@ -1,0 +1,148 @@
+---
+title: Merge Node · Five Modes Demystified
+description: How to combine two branches — Append / Combine / SQL Query patterns
+sidebar:
+  order: 3
+  label: 4.2 Merge
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 4 · Section 2</span>
+
+Merge has one of the highest beginner-trap rates — the word "merge" hides five different semantics. This section diagrams each: **input → output**.
+
+## Two inputs
+
+<TerminalCell filename="merge-shape.txt" runTag="🔀">
+{`[Source A] ──→ Input 1 ┐
+                       │── Merge ──→ output
+[Source B] ──→ Input 2 ┘`}
+</TerminalCell>
+
+What the output looks like **depends entirely on the mode**.
+
+## Mode 1 · Append (most common)
+
+Concatenate Input 2's items after Input 1. **1+1 → 2.**
+
+<TerminalCell filename="merge-append.txt" runTag="➕">
+{`Input 1:  [ {a:1}, {a:2} ]
+Input 2:  [ {b:3}, {b:4} ]
+
+Mode: Append
+
+Output:   [ {a:1}, {a:2}, {b:3}, {b:4} ]`}
+</TerminalCell>
+
+**For:** simple aggregation after parallel branches.
+
+## Mode 2 · Combine by Position
+
+Pair 1st-with-1st, 2nd-with-2nd, … combining into new objects.
+
+<TerminalCell filename="merge-position.txt" runTag="🧩">
+{`Input 1:  [ {name:"Alice"}, {name:"Bob"}, {name:"Carol"} ]
+Input 2:  [ {age:30},        {age:25},      {age:28} ]
+
+Mode: Combine → By Position
+
+Output:   [ {name:"Alice", age:30}, {name:"Bob", age:25}, {name:"Carol", age:28} ]`}
+</TerminalCell>
+
+**For:** two sources that are 1:1 by ordering (e.g. fetched user-info and user-balance in parallel).
+
+⚠ Requires same count. Mismatches get null-padded.
+
+## Mode 3 · Combine by Matching Fields (SQL-like JOIN)
+
+Pair by a shared field value (similar to SQL JOIN).
+
+<TerminalCell filename="merge-fields.txt" runTag="🔗">
+{`Input 1:  [ {id:1, name:"Alice"}, {id:2, name:"Bob"} ]
+Input 2:  [ {id:1, age:30},        {id:3, age:99} ]
+
+Mode: Combine → By Matching Fields
+  Field from Input 1:  id
+  Field from Input 2:  id
+
+Output:   [ {id:1, name:"Alice", age:30} ]
+         (only matching rows — INNER JOIN)
+
+Output modes:
+  - Keep Unmatched From Input 1   (LEFT JOIN)
+  - Keep Unmatched From Both      (FULL JOIN)`}
+</TerminalCell>
+
+**For:** joining two datasets sharing an identifier.
+
+## Mode 4 · Combine All (Cartesian)
+
+Every Input 1 paired with every Input 2 — **N×M output**.
+
+<TerminalCell filename="merge-all.txt" runTag="✖">
+{`Input 1:  [ {a:1}, {a:2} ]
+Input 2:  [ {b:3}, {b:4} ]
+
+Mode: Combine → All
+
+Output:   [ {a:1, b:3}, {a:1, b:4}, {a:2, b:3}, {a:2, b:4} ]
+         2 × 2 = 4 items`}
+</TerminalCell>
+
+**For:** rare cases needing all combinations (e.g. 3 users × 5 products = 15 test emails). **Use carefully — explodes fast.**
+
+## Mode 5 · SQL Query (most flexible)
+
+Write actual SQL — runs on an in-memory SQLite engine.
+
+<TerminalCell filename="merge-sql.txt" runTag="🗄">
+{`Mode: SQL Query
+
+SELECT a.id, a.name, b.age, b.balance
+FROM input1 a
+LEFT JOIN input2 b ON a.id = b.user_id
+WHERE b.balance > 1000`}
+</TerminalCell>
+
+## Decision tree
+
+<TerminalCell filename="merge-decision.txt" runTag="🌳">
+{`Q: What output do you want?
+    
+    [All items concatenated] ─────→ Append
+    [1:1 paired by order]    ─────→ Combine by Position
+    [Joined by field]        ─────→ Combine by Matching Fields
+    [All combinations]       ─────→ Combine All  (careful)
+    [SQL-level flexibility]  ─────→ SQL Query`}
+</TerminalCell>
+
+## Common traps
+
+<TipCallout type="warn" title="Trap 1 · Used Append when needed Combine by Position">
+  
+  You wanted 5 combined user objects but used Append → got 10 partial items. **Diagnose:** check item counts vs expectation.
+  
+</TipCallout>
+
+<TipCallout type="warn" title="Trap 2 · Field type mismatch in Combine by Matching Fields">
+  
+  Input 1's `id` is number `123`, Input 2's is string `"123"` — match fails (strict comparison). **Fix:** normalize types with Set node first.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Two Manual Triggers each emit 5 items (one with `name`, one with `age`). Merge using **By Position**. Switch to **Append** — observe the difference.
+</TipCallout>
+
+## Section recap
+
+- Five modes — **pick wrong, get wrong**
+- Append = concat (most common)
+- Combine by Position = 1:1 pairing
+- Combine by Matching Fields = SQL JOIN flavor
+- Combine All = Cartesian (careful)
+- SQL Query = ultimate flexibility
+
+Next: [SplitInBatches](../split-batches/) — the reverse, slicing arrays into batches.

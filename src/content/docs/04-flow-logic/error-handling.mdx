@@ -1,0 +1,207 @@
+---
+title: 错误处理体系 · 三件套
+description: Continue On Fail + Error Trigger + Error Workflow —— 让工作流"挂得起、抓得到"
+sidebar:
+  order: 6
+  label: 4.5 错误处理
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 4 章 · 第 5 节</span>
+
+到目前为止，你的所有 workflow 都是"happy path"——节点跑挂了？整条流程戛然而止。但**真实生产**永远有意外：API 超时、字段缺失、网络抖动。这一节讲 n8n 的三件套——**单节点容错 + 工作流级捕获 + 全局兜底**。
+
+## 三件套全景
+
+<TerminalCell filename="error-trio.txt" runTag="🛡">
+{`三件套：
+
+① Continue On Fail                    （节点级 · 单点容错）
+   "这个节点挂了，让下游照样跑"
+   
+② Error Trigger + 错误分支              （workflow 级 · 抓到错误另起一条线）
+   "整个工作流挂了，启动错误处理工作流"
+   
+③ Error Workflow（全局）                 （账户级 · 兜底通知）
+   "任何 workflow 挂了，都触发统一的告警流程"`}
+</TerminalCell>
+
+每一层职责不同。**生产级工作流通常三个都要配**。
+
+## ① Continue On Fail（节点级）
+
+打开任一节点 → **Settings** tab → 找到 "**Continue On Fail**" → 打开。
+
+<TerminalCell filename="continue-on-fail.txt" runTag="🚧">
+{`默认行为：
+  [HTTP Request] 挂了 → 整个 workflow 停止
+
+开了 Continue On Fail 后：
+  [HTTP Request] 挂了 → 该节点输出一个 error item → 下游继续跑
+  
+  error item 长这样：
+  { "error": { "message": "Request timeout", ... } }`}
+</TerminalCell>
+
+下游可以用 IF 节点判断 `{{ $json.error }}` 是否存在来分流：
+
+<TerminalCell filename="error-branching.txt" runTag="🚧">
+{`[HTTP Request (Continue On Fail)] → [IF ($json.error exists?)]
+                                          ├── True ──→ [Log Error]
+                                          └── False ─→ [Process Success]`}
+</TerminalCell>
+
+**何时用：** 单个节点失败你**不希望整流程挂**（如批量处理 100 个 user，1 个挂掉不影响另 99 个）。
+
+## ② Error Trigger + 错误分支
+
+这是更强的方式——一个**独立的触发器节点**，专门接住失败事件。
+
+### 步骤
+
+<TerminalCell filename="error-trigger-setup.txt" runTag="🪤">
+{`1. 在主 workflow 里：
+   Settings → Error workflow → 选 "this workflow"（或另一个 workflow）
+
+2. 在同一画布上加一个节点 "Error Trigger"
+   它不接任何上游 —— 仅在主流程挂掉时被激活
+
+3. Error Trigger 输出包含：
+   - $json.execution            (失败的 execution 信息)
+   - $json.workflow             (workflow 元信息)
+   - $json.execution.error      (错误对象)
+   
+4. 后接 Slack / Email / 自定义错误日志节点 —— 通知或记录`}
+</TerminalCell>
+
+### 工作原理
+
+<TerminalCell filename="error-trigger-flow.txt" runTag="🪤">
+{`正常路径（同一画布）：
+  [Webhook] → [Process] → [Save to DB] → [Notify]
+  
+错误路径（同一画布，独立的入口）：
+  [Error Trigger] → [Format Error] → [Send to Slack #alerts]
+                                          ↑
+                                          自动 "失败时启动"`}
+</TerminalCell>
+
+**何时用：** 你想知道**任何**节点挂了都收到通知（不只是某一个特定节点）。
+
+## ③ Error Workflow（全局兜底）
+
+让**所有** workflow 挂掉时，都触发一个统一的"全局错误处理 workflow"——比如统一发到 Slack 的 #alerts 频道。
+
+### 设置
+
+<TerminalCell filename="global-error-wf.txt" runTag="🌐">
+{`1. 建一个专门的 workflow，比如叫 "Global Error Handler"
+   入口节点 = Error Trigger
+   后续：格式化错误信息 → Slack / Email / PagerDuty 通知
+
+2. 去其他每个 workflow 的 Settings → Error workflow:
+   选 "Global Error Handler"
+
+3. 任何一个 workflow 挂掉时，都会自动触发 Global Error Handler，
+   传入 $json.workflow 让你知道是哪个 workflow 挂的。`}
+</TerminalCell>
+
+### 一份"通用错误格式化" workflow 长这样
+
+<TerminalCell filename="error-handler-recipe.txt" runTag="🌐">
+{`[Error Trigger]
+   ↓
+[Set] 字段：
+   workflow_name = {{ $json.workflow.name }}
+   workflow_url  = https://your-n8n.com/workflow/{{ $json.workflow.id }}
+   error_msg     = {{ $json.execution.error.message }}
+   failed_node   = {{ $json.execution.error.node.name }}
+   ↓
+[Slack #alerts]
+   Channel:   #alerts
+   Message:   🚨 *{{ $json.workflow_name }}* failed
+              Node: {{ $json.failed_node }}
+              Error: {{ $json.error_msg }}
+              <{{ $json.workflow_url }}|Open in editor>`}
+</TerminalCell>
+
+## 一些进阶模式
+
+### Stop and Error（主动制造错误）
+
+有时你想"判断不合法就**主动**让流程挂掉"。用 **Stop and Error** 节点：
+
+<TerminalCell filename="stop-and-error.txt" runTag="🛑">
+{`[Webhook] → [IF (data is valid?)] ─ False ─→ [Stop and Error]
+                                                Error Message: "Invalid request: {{ $json.reason }}"`}
+</TerminalCell>
+
+这会让整个 Execution 状态变 `error`，并触发 Error Workflow（如果配了）。
+
+### Retry On Fail（节点级重试）
+
+节点 → Settings → "**Retry On Fail**" → 开 → 设置 Retries 次数和间隔。
+
+<TerminalCell filename="retry-on-fail.txt" runTag="🔁">
+{`HTTP Request:
+  Retry On Fail:    true
+  Max Tries:        3
+  Wait Between:     2 seconds (with jitter)
+  
+节点挂了会自动重试 2 次（共 3 次尝试）。常用于网络抖动场景。`}
+</TerminalCell>
+
+### Wait on Errors（暂停 vs 失败）
+
+某些节点（如 Wait 节点）可以配 "On Error" 行为：
+
+- **Stop Workflow**（默认）
+- **Continue (using error output)** —— 继续，但用 error 数据
+- **Continue Workflow** —— 继续，且不当错误
+
+## 错误处理决策树
+
+<TerminalCell filename="error-decision.txt" runTag="🌳">
+{`Q: 这个节点挂了，我希望什么发生？
+
+[整流程立刻停下] ────────→ 默认行为（什么都不配）
+
+[这一步挂没关系，下游照跑] ──→ 节点 Settings → Continue On Fail
+
+[挂了想暗中重试几次] ─────→ 节点 Settings → Retry On Fail
+
+[整流程挂了我要被通知] ────→ 工作流 Settings → Error workflow
+                              + 一个全局 Error Trigger workflow
+
+[判断不通过我要主动挂] ────→ 加一个 Stop and Error 节点`}
+</TerminalCell>
+
+<TipCallout type="warn" title='新手最大遗憾 · "我以为它会通知我"'>
+  
+  n8n 默认**不会主动通知你**任何 workflow 挂了——它只在 Executions 里留个红色错误记录。**生产环境务必配 Error Workflow**——没配，你就是"瞎跑"。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  写一个"Global Error Handler" workflow：
+  
+  1. 入口 = Error Trigger
+  2. 格式化错误信息为 Markdown
+  3. 发到你的 Telegram（或 Slack / Discord）
+  4. 然后在你已有的任意 workflow 的 Settings 里把 Error workflow 设成它
+  5. 故意让那个 workflow 挂一下（比如把 HTTP 的 URL 改错），看是不是收到通知
+  
+</TipCallout>
+
+## 本节要点回顾
+
+- 三件套：Continue On Fail（节点级）→ Error Trigger（workflow 级）→ Error Workflow（全局）
+- 生产 workflow 至少应配 **Error Workflow** 兜底
+- Stop and Error 节点：主动制造错误
+- Retry On Fail：自动重试网络抖动
+- **n8n 默认不主动告警**，必须自己配
+
+下一节[Sub-workflow 模块化](../sub-workflows/)——把常用逻辑抽成"函数"。

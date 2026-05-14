@@ -1,0 +1,133 @@
+---
+title: IF / Switch · Conditional Branching
+description: Send your workflow down different paths — IF (binary) and Switch (multi-way) usage
+sidebar:
+  order: 2
+  label: 4.1 IF / Switch
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 4 · Section 1</span>
+
+Linear workflows (A → B → C) handle one shape of problem. **Real business** is full of "if X, else Y" — this section covers IF and Switch.
+
+## IF: binary split
+
+IF evaluates a condition and outputs two branches: **True** (✓) and **False** (✗).
+
+<TerminalCell filename="if-canvas.txt" runTag="🔀">
+{`              ┌─── True ──→ [Send Notification]
+[Get Data] ──▶│ IF (cond)│
+              └── False ──→ [Log Error]`}
+</TerminalCell>
+
+### Config example
+
+<TerminalCell filename="if-config.txt" runTag="⚙">
+{`Conditions:  Number
+  Value 1:    {{ $json.score }}
+  Operator:   >
+  Value 2:    60
+
+Combine:  AND   (multiple conditions)`}
+</TerminalCell>
+
+### Supported operators
+
+| Type | Operators |
+|---|---|
+| **Number** | `=`, `≠`, `>`, `<`, `≥`, `≤` |
+| **String** | `=`, `≠`, contains, starts/ends with, is empty, regex match |
+| **Boolean** | is true, is false |
+| **Date** | is before, is after, is exactly |
+| **Array / Object** | is empty, contains, length = |
+
+### AND vs OR
+
+<TerminalCell filename="multi-condition.txt" runTag="🎯">
+{`AND — all must match:
+  - {{ $json.tier }}  =  "VIP"
+  - {{ $json.score }} >  100
+  
+OR — any:
+  - {{ $json.tier }}  =  "VIP"
+  - {{ $json.score }} >  500`}
+</TerminalCell>
+
+## Switch: multi-way split
+
+Like a `switch...case`. Match a value against multiple branches:
+
+<TerminalCell filename="switch-canvas.txt" runTag="🔀">
+{`                ┌── case "pro"   ──→ [Pro Workflow]
+[Get User] ───▶ │ Switch │── case "free"  ──→ [Free Workflow]
+                │  $json │── case "trial" ──→ [Trial Workflow]
+                │  .tier │── fallback     ──→ [Default Workflow]
+                └────────┘`}
+</TerminalCell>
+
+Two modes: **Rules** (recommended, per-branch conditions) and **Expression** (auto-route by expression result).
+
+<TerminalCell filename="switch-rules.txt" runTag="⚙">
+{`Mode: Rules
+Output 0:  Conditions:  {{ $json.tier }} = "pro"
+Output 1:  Conditions:  {{ $json.tier }} = "free"
+Output 2:  Conditions:  {{ $json.tier }} = "trial"
+
+Fallback Output:  catches everything else`}
+</TerminalCell>
+
+## IF vs Switch — pick
+
+| Scenario | Use |
+|---|---|
+| Binary (yes/no) | **IF** |
+| Mutually-exclusive branches by field value | **Switch** |
+| Multiple **parallel** conditions (not exclusive) | Multiple IFs in parallel, or Filter node |
+
+## Common patterns
+
+### Early return
+
+<TerminalCell filename="early-return.txt" runTag="📍">
+{`[Webhook] → [IF (valid?)] ──┬── True ──→ continue
+                            └── False ──→ [Stop and Error]`}
+</TerminalCell>
+
+### Routing by amount
+
+<TerminalCell filename="split-routing.txt" runTag="📍">
+{`[Get Orders] → [Switch (by amount)]
+                  ├── < $100      → [Standard]
+                  ├── $100~$1000  → [Manager Approval]
+                  └── > $1000     → [VP Approval]`}
+</TerminalCell>
+
+### IF + Merge (re-join branches)
+
+<TerminalCell filename="if-merge.txt" runTag="📍">
+{`[Get User] → [IF (paid?)] ── True ──→ [Premium Badge] ──┐
+                          └─ False ──→ [Free Badge]    ─┤── Merge ── [Send Email]
+                                                        ┘`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Empty-side dry-run">
+  
+  If your IF condition routes **all** items to True, the False branch downstream gets 0 items — those nodes still "execute" with 0 iterations. Usually fine, but for side-effect nodes ("delete files"), it silently does nothing.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Build: Manual Trigger emits 5 items (each with `score` 0-100). Use Switch to route into three tiers (low &lt;60, mid 60-80, high &gt;80), each tagging items via a Set node.
+</TipCallout>
+
+## Section recap
+
+- IF = binary; Switch = multi-way
+- Multi-condition: AND (all) or OR (any)
+- Empty-side IF causes 0-iteration downstream — side effects don't fire
+- Replace nested IFs with Switch when there are 3+ branches
+
+Next: [Merge](../merge/) — the natural partner for re-joining branches.

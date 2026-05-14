@@ -1,0 +1,184 @@
+---
+title: Sub-workflow · 把 workflow 写成"函数"
+description: 抽出可复用的小工作流 —— 主流程清爽 + 多处共享 + 单独测试
+sidebar:
+  order: 7
+  label: 4.6 Sub-workflow
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 4 章 · 第 6 节</span>
+
+写代码我们抽函数；做 n8n 工作流也一样——重复出现的"组装一段逻辑"应该抽成可复用单元。这就是 **Sub-workflow**：让你的工作流变成"调用其他工作流"的小巧主流程。
+
+## 为什么要 Sub-workflow
+
+| 痛点 | Sub-workflow 解药 |
+|---|---|
+| 同一段逻辑在 5 个 workflow 里复制粘贴 | 抽成 1 个 sub-workflow，5 处调用 |
+| 主 workflow 太长，画布像意大利面 | 把分支抽走，主流程清爽 |
+| 单元想独立测试 | sub-workflow 可以单独 Test workflow |
+| 团队协作，逻辑封装边界 | 每个 sub-workflow 一个 owner |
+
+## 创建一个 Sub-workflow
+
+跟普通 workflow 完全一样，只是**触发器换成 "Execute Sub-workflow Trigger"**：
+
+<TerminalCell filename="sub-workflow-recipe.txt" runTag="🧩">
+{`Sub-workflow: "Send Slack Alert"
+
+[Execute Sub-workflow Trigger]  ← 入口
+  Input fields:
+    - title    (string)
+    - message  (string)
+    - severity (string: info / warn / error)
+   ↓
+[Format Message]
+   ↓
+[Slack]
+   ↓
+[Return]  ← 输出回主 workflow（可选）`}
+</TerminalCell>
+
+入口节点会让你定义"参数清单"——这就像函数签名，主 workflow 调用时按这个清单传值。
+
+## 在主 workflow 里调用
+
+用 **Execute Workflow** 节点：
+
+<TerminalCell filename="execute-workflow.txt" runTag="📞">
+{`Main workflow:
+  ... → [Execute Workflow] → ...
+        Workflow: "Send Slack Alert"  ← 下拉选 sub-workflow
+        Inputs:
+          title:    ={{ "Order Failed" }}
+          message:  ={{ $json.errorMsg }}
+          severity: error
+
+执行时：
+  Execute Workflow 节点接管控制权 → 调用 sub-workflow → 等返回 → 把返回值放到 output
+
+主 workflow 看 Execute Workflow 的输出就拿到了 sub-workflow 的 return 值。`}
+</TerminalCell>
+
+## 三种调用模式
+
+<TerminalCell filename="three-modes.txt" runTag="🎛">
+{`Execute Workflow 节点的 "Mode" 有 3 个选项：
+
+1. Run once with all items
+   主流程 100 个 item → sub-workflow 被调用 1 次，输入是整个数组
+   
+2. Run once for each item   (默认)
+   主流程 100 个 item → sub-workflow 被调用 100 次，每次 1 个 item
+   
+3. Run via Webhook
+   把 sub-workflow 当 HTTP API 调（异步、跨实例）`}
+</TerminalCell>
+
+**新手默认用 "Run once for each item"**——跟其他节点的迭代行为一致。
+
+## 经典使用场景
+
+### 场景 1 · 通用通知 sub-workflow
+
+<TerminalCell filename="notify-subwf.txt" runTag="📢">
+{`Sub-workflow: "Notify"
+  Input: { channel, message, severity }
+  Logic:
+    severity=error → Slack #alerts (红色)
+    severity=warn  → Slack #ops    (黄色)
+    severity=info  → Slack #updates (蓝色)
+
+主 workflow 想发通知 → Execute Workflow "Notify" + 传参就完事
+不再每个 workflow 自己写 Slack 节点的格式化逻辑`}
+</TerminalCell>
+
+### 场景 2 · 通用数据写入 sub-workflow
+
+<TerminalCell filename="save-record.txt" runTag="💾">
+{`Sub-workflow: "Save Record"
+  Input: { table, data }
+  Logic:
+    - 验证字段
+    - 加 timestamp / created_by
+    - 写 Postgres
+    - 同步到 Notion（备份）
+
+3 个不同入口的 workflow（Webhook / Schedule / Manual）都调它来落库`}
+</TerminalCell>
+
+### 场景 3 · 分而治之
+
+<TerminalCell filename="divide-conquer.txt" runTag="✂">
+{`主 workflow (清爽)：
+  [Webhook] → [Execute Workflow "Validate"]
+            → [Execute Workflow "Enrich"]
+            → [Execute Workflow "Save"]
+            → [Execute Workflow "Notify"]
+
+每个 sub-workflow 5-10 个节点，专注一件事。主流程看起来像伪代码。`}
+</TerminalCell>
+
+## Sub-workflow 的常用约定
+
+<TerminalCell filename="sub-conventions.txt" runTag="📐">
+{`命名约定：
+  ✅ [sub] Send Slack Alert        ← 前缀标明是 sub-workflow
+  ✅ [util] Validate Email
+  
+返回值约定：
+  - 成功：{ success: true, data: ... }
+  - 失败：{ success: false, error: "..." }
+  
+统一签名让所有 sub-workflow 调用方式一致，主 workflow 处理逻辑也统一。`}
+</TerminalCell>
+
+## 限制和坑
+
+<TipCallout type="warn" title="坑 1 · 凭证作用域">
+  
+  Sub-workflow 用的是**它自己**配的凭证，不是主 workflow 的。如果主 workflow 的 owner 跟 sub-workflow 不一样，凭证可能没共享——sub-workflow 跑不动。
+  
+  **解药**：sub-workflow 的凭证 → Sharing → 加上所有要调用它的人/组。
+  
+</TipCallout>
+
+<TipCallout type="warn" title="坑 2 · 递归调用风险">
+  
+  Sub-workflow 调用自己（直接或间接）= 递归。n8n 不会自动检测无限递归——会一直跑直到 timeout 或耗尽资源。
+  
+  **解药**：每次递归都加退出条件 + 计数器，确保有"基本情况"返回。
+  
+</TipCallout>
+
+<TipCallout type="warn" title="坑 3 · 调试复杂">
+  
+  Execution 历史在主 workflow 里只显示"Execute Workflow"节点跑了 N 次，**看不到 sub-workflow 内部执行细节**。要调试 sub-workflow 内部，得单独打开它，看它自己的 Executions tab。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  把第 4.5 节的"Global Error Handler" 改造成一个 sub-workflow：
+  
+  1. 入口节点改成 Execute Sub-workflow Trigger
+  2. Input 定义：`workflowName`, `errorMessage`, `failedNodeName`
+  3. 主流程的 Error Trigger 收到错误后，调用这个 sub-workflow 传参
+  
+  好处：换通知渠道时只改这一个 sub-workflow。
+  
+</TipCallout>
+
+## 本节要点回顾
+
+- Sub-workflow = workflow 的"函数封装"
+- 入口节点用 Execute Sub-workflow Trigger，**定义参数清单**
+- 主 workflow 用 Execute Workflow 节点调用
+- 三种调用模式：all-items / each-item（默认）/ webhook
+- 用约定（命名前缀 + 返回格式）让团队复用更顺
+- 注意：凭证作用域 + 递归风险 + 调试需切到 sub-workflow
+
+至此你已学完 **第 4 部分**。下一部分进入最有趣的 [Part 5 · AI 与 Agent](../../05-ai-agents/overview/)。

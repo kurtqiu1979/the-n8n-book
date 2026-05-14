@@ -1,0 +1,127 @@
+---
+title: Loop Over Items (Split in Batches) · Control Concurrency & Rate
+description: Slice big arrays into small batches for sequential processing — the standard rate-limit shield
+sidebar:
+  order: 4
+  label: 4.3 Loop Over Items
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 4 · Section 3</span>
+
+Third-party APIs almost always rate-limit — "max 60 calls per minute." When you have 1000 items to send, n8n's default "process each item in parallel" instantly blows past the limit. **Loop Over Items** (formerly **Split in Batches**) is the cure: slice the array into small batches and process **sequentially**.
+
+## What it does
+
+<TerminalCell filename="batches-shape.txt" runTag="📦">
+{`Input:   [item1, item2, item3, ..., item100]   (100 in one shot)
+
+Loop Over Items  Batch Size = 10
+
+Outputs (sequentially):
+        iteration 1 → [item1, ..., item10]    (10)
+        iteration 2 → [item11, ..., item20]
+        ...
+        iteration 10 → [item91, ..., item100]
+        each batch finishes the entire downstream chain before the next starts`}
+</TerminalCell>
+
+**Key insight:** it doesn't just "split" the array — it makes the downstream run **once per batch**.
+
+## Classic pattern
+
+<TerminalCell filename="rate-limit-pattern.txt" runTag="⏱">
+{`Scenario: 1000 users × send a personalized email each, Mailgun rate-limits 60/min
+
+Without Loop Over Items:
+  [Get 1000 Users] ──→ [Send Email]  ❌ instant rate-limit, mass failure
+
+With Loop Over Items:
+  [Get 1000 Users] ──→ [Loop Over Items (size=50)] ──→ [Send Email] ──→ [Wait 60s] ──┐
+                              ▲                                                      │
+                              └──────────────────────────────────────────────────────┘
+                              next batch
+
+  1000 / 50 = 20 batches × 60s = 20 min total, API stays happy`}
+</TerminalCell>
+
+## Configuration
+
+<TerminalCell filename="batches-config.txt" runTag="⚙">
+{`Batch Size:   items per batch        e.g. 10 / 50 / 100
+Options:
+  Reset:      reset batch counter across runs (usually false)`}
+</TerminalCell>
+
+## The "loop-back" mechanic
+
+This confuses everyone first time. The node has **one output port**, but it behaves like a loop — via implicit "loop-back":
+
+<TerminalCell filename="loop-mechanic.txt" runTag="🔁">
+{`On canvas:
+                                          ┌──── batch done ─────┐
+                                          ▼                     │
+[Get Users] ─→ [Loop Over Items] ─→ [Send Email] ─→ [Wait] ─────┘
+              
+Loop Over Items emits current batch → downstream processes → control returns
+Loop Over Items checks: more batches left? → emit next → or stop`}
+</TerminalCell>
+
+n8n auto-wires the downstream chain's "tail" back to Loop Over Items. **No manual wiring needed.**
+
+## Paired with Wait — strict rate limiting
+
+<TerminalCell filename="batches-wait.txt" runTag="⏰">
+{`Requirement: 60/min API
+
+Strategy A — batch + pause
+  Batch Size = 60
+  Wait = 60 seconds
+  → process 60, wait 60s
+
+Strategy B — smoothed
+  Batch Size = 1
+  Wait = 1.1 seconds
+  → one at a time, 1.1s gap
+
+A is bursty; B is smooth. Pick based on the API's burst policy.`}
+</TerminalCell>
+
+## Know which batch
+
+<TerminalCell filename="batch-metadata.txt" runTag="🔍">
+{`Output of each item carries:
+  $json                      ← item's data
+
+Special context:
+  $('Loop Over Items').context.currentRunIndex   ← batch index (0-based)
+  $('Loop Over Items').context.noItemsLeft       ← last batch?
+
+Practical:
+  ={{ $('Loop Over Items').context.currentRunIndex + 1 }} / {{ Math.ceil($('Get Users').all().length / 50) }}
+  → outputs "3 / 20" (batch 3 of 20)`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Thinking it parallelizes">
+  
+  Loop Over Items is a **slow-down** tool, not a speed-up. It makes downstream **sequential**, one batch per round. If you want speed, **remove it** and let default concurrency happen.
+  
+  Real speed-ups: (1) optimize downstream nodes; (2) Queue mode (multiple workers).
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Build: Code node emits 100 items (`[{i:1}, ..., {i:100}]`) → Loop Over Items (size=10) → Wait 2s → Set ("Processed batch X / 10"). Watch the execution timeline — should take exactly ~20s (10 batches × 2s).
+</TipCallout>
+
+## Section recap
+
+- Loop Over Items = slice into small batches, **sequential** downstream
+- Primarily a **rate-limit shield**
+- Classic pair: Loop Over Items + Wait
+- **Not a parallelization tool** — it slows down
+- Use `context.currentRunIndex` for "batch X of Y" UX
+
+Next: [other looping patterns](../loops/).

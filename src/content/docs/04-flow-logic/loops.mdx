@@ -1,0 +1,167 @@
+---
+title: 循环模式 · 5 种姿势对比
+description: n8n 里"循环"其实有 5 种写法 —— 各自适合什么场景
+sidebar:
+  order: 5
+  label: 4.4 循环模式
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 4 章 · 第 4 节</span>
+
+n8n 没有一个明确的 "Loop" 节点——这让新手很困惑。事实上，n8n 里**至少有 5 种实现循环的姿势**，每种适合不同场景。这一节把它们都摆出来。
+
+## 姿势 1 · 默认 item 迭代（最常用）
+
+最自然的"循环"。节点对每个 item 各自跑一次——你**不需要**做任何事，n8n 自动处理。
+
+<TerminalCell filename="default-loop.txt" runTag="🔁">
+{`[Get Sheets (100 rows)] ─→ [HTTP Request]
+
+n8n 自动让 HTTP Request 跑 100 次，每次用一个 row 的数据。
+没有显式 "for" —— 这是 n8n 的默认行为。`}
+</TerminalCell>
+
+**何时用：** 90% 的"对每条数据做一遍"的场景。
+
+## 姿势 2 · SplitInBatches（分批迭代）
+
+第 4.3 节讲过，主要为了限速：
+
+<TerminalCell filename="splitbatches.txt" runTag="📦">
+{`[1000 items] → SplitInBatches (size=50) → 处理 → 回流`}
+</TerminalCell>
+
+**何时用：** 限流场景。
+
+## 姿势 3 · Code 节点里的 for/while
+
+Code 节点里你写真正的 JS，想怎么循环就怎么循环：
+
+<TerminalCell filename="code-loop.txt" runTag="💻">
+{`// Code 节点的 JS:
+
+const results = [];
+for (const item of $input.all()) {
+  results.push({
+    json: {
+      original: item.json,
+      doubled: item.json.value * 2,
+    }
+  });
+}
+return results;
+
+// 也可以 while
+let counter = 0;
+const out = [];
+while (counter < 10) {
+  out.push({ json: { i: counter } });
+  counter++;
+}
+return out;`}
+</TerminalCell>
+
+**何时用：** 需要复杂控制流（提前 break、嵌套循环、计数器）。
+
+## 姿势 4 · Webhook 重复触发（"轮询"）
+
+不是真正的循环，但效果类似：让 workflow 自己再次触发自己：
+
+<TerminalCell filename="self-trigger.txt" runTag="🔄">
+{`[Schedule (每 5 分钟)] → [HTTP 检查任务] → [IF (任务未完成?)] ──Yes── [Continue]
+                                                            └─ No ── [Stop]
+                                                            
+                                                            
+                                                            
+每次跑都做一小步。"长任务"分多次完成。`}
+</TerminalCell>
+
+**何时用：** 长时间运行的任务（如轮询某个外部状态直到完成）。
+
+## 姿势 5 · Sub-workflow 递归
+
+工作流 A 调用自己（或调用工作流 B，B 再调 A），实现递归：
+
+<TerminalCell filename="recursive.txt" runTag="🌀">
+{`Workflow A:
+  收到 input ─→ [IF (基本情况?)] ──Yes── return
+                              └─ No  ── [Execute Workflow A (input 缩小)]
+                                       
+                                       
+                                       
+经典递归模式。慎用 —— 容易栈爆。`}
+</TerminalCell>
+
+**何时用：** 树遍历、分治算法。**绝大多数业务场景不需要**——能不用就不用。
+
+## 5 种姿势对比
+
+| 姿势 | 优点 | 缺点 | 何时用 |
+|---|---|---|---|
+| 默认 item 迭代 | 最简单 | 没有 break 能力 | 90% 场景 |
+| SplitInBatches | 限速控制好 | 串行，慢 | 防 API 限流 |
+| Code 节点 | 最灵活 | 要会 JS | 复杂控制流 |
+| Self-trigger | 能跨长时间 | 状态管理麻烦 | 长任务/轮询 |
+| 递归 sub-workflow | 树遍历 | 容易栈爆 | 极少数特殊场景 |
+
+## 何时**该**用循环、何时**不该**
+
+很多新手用 `for` 写一段 5 行的 Code 节点——其实**默认 item 迭代**就够用了。
+
+<TerminalCell filename="loop-or-not.txt" runTag="💡">
+{`❌ 反例（多此一举）：
+  [Get 5 Users] → [Code: for (u of items) { fetch... }]
+  
+✅ 正解：
+  [Get 5 Users] → [HTTP Request]  ← 直接让 HTTP 对每个 user 跑一遍
+
+❌ 反例（试图用 Code 限速）：
+  [Code: for (let i = 0; i < 100; i++) { sleep(1000); fetch... }]
+  ↑ 不要在 Code 节点里 sleep —— 会卡住整个 worker
+  
+✅ 正解：
+  [SplitInBatches (size=1) + Wait (1s) + HTTP Request]`}
+</TerminalCell>
+
+## 实战：分页拉取数据
+
+API 返回分页，要拉所有页 —— 经典"循环"场景。两种实现：
+
+### 方案 A · Loop Over Items 节点 (n8n 1.x 新)
+
+n8n 现在有个 "**Loop Over Items**"（旧名 SplitInBatches）节点的高级模式：
+
+<TerminalCell filename="pagination-loop.txt" runTag="📄">
+{`[Manual Trigger] → [Set (page=1)] → [Loop Over Items] ──→ [HTTP GET /api/?page={{ $json.page }}]
+                                                              ↓
+                                                       [IF (has next page?)] ── Yes ──→ [Set (page+1)] ──┘
+                                                                              └── No ──→ [Done]`}
+</TerminalCell>
+
+### 方案 B · 用递归 sub-workflow
+
+略——见上面"姿势 5"。**新手不推荐**。
+
+<TipCallout type="warn" title='新手心法 · 先想"能不能不写循环"'>
+  
+  n8n 默认行为已经覆盖了 80% 的"循环"场景。**先把节点连起来跑一下**——如果默认迭代能搞定，就不要画蛇添足。需要循环时，**第一选择是 SplitInBatches**，最后才考虑 Code 节点的显式 for。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  实现一个分页 workflow：从 https://jsonplaceholder.typicode.com/posts 拉数据，每页 10 条，循环到拉完为止。用 Loop Over Items 实现。
+</TipCallout>
+
+## 本节要点回顾
+
+- n8n 默认 item 迭代是最自然的"循环"
+- 限流用 SplitInBatches
+- 复杂逻辑（break、嵌套）用 Code 节点
+- 长任务/轮询用 Self-trigger
+- 递归 sub-workflow 慎用
+- 总原则：**先尝试默认迭代，不行再升级**
+
+下一节[错误处理体系](../error-handling/)——工作流跑挂了怎么办？

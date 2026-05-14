@@ -1,0 +1,130 @@
+---
+title: SplitInBatches · 控制并发与速率
+description: 把大批 items 切成小批次顺序处理 —— 防 API 限流的标配
+sidebar:
+  order: 4
+  label: 4.3 SplitInBatches
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 4 章 · 第 3 节</span>
+
+第三方 API 几乎都有限流——"每分钟最多 60 次"。当你有 1000 个 items 要发请求时，n8n 默认的"对每个 item 并发处理"会瞬间把 API 打爆。**SplitInBatches** 就是干这个的：把大数组切成小批次，**顺序**处理。
+
+## 它做的事
+
+<TerminalCell filename="batches-shape.txt" runTag="📦">
+{`输入：  [item1, item2, item3, ..., item100]   (一次性 100 个)
+
+SplitInBatches  Batch Size = 10
+
+输出：  迭代 1 → [item1, ..., item10]    （10 个）
+        迭代 2 → [item11, ..., item20]
+        ...
+        迭代 10 → [item91, ..., item100]
+        每一批走完整个下游链条后，才开始下一批`}
+</TerminalCell>
+
+**关键**：它不是把数组"切开"——它**让下游对每一批跑一次完整流程**。
+
+## 经典用法
+
+<TerminalCell filename="rate-limit-pattern.txt" runTag="⏱">
+{`场景：1000 用户 × 给每个发一封个性化邮件，但 Mailgun API 每分钟限 60 次
+
+无 SplitInBatches:
+  [Get 1000 Users] ──→ [Send Email]  ❌ 立刻触发限流，全军覆没
+
+有 SplitInBatches:
+  [Get 1000 Users] ──→ [SplitInBatches (size=50)] ──→ [Send Email] ──→ [Wait 60s] ──┐
+                              ▲                                                    │
+                              └────────────────────────────────────────────────────┘
+                              下一批
+                              
+  1000 / 50 = 20 批 × 60s = 20 分钟跑完，API 不爆`}
+</TerminalCell>
+
+## 配置参数
+
+<TerminalCell filename="batches-config.txt" runTag="⚙">
+{`Batch Size:   每批多少 item        例: 10 / 50 / 100
+Options:
+  Reset:      是否在多次执行时重置批次计数（多数场景 false）`}
+</TerminalCell>
+
+## SplitInBatches 的特殊"回流"
+
+这是新手最困惑的地方。SplitInBatches 节点**只有一个输出口**，但它的行为像循环——通过"`-loopBack` 输出"实现：
+
+<TerminalCell filename="splitbatches-loop.txt" runTag="🔁">
+{`画布上看：
+                                      ┌──── 上次批次完 ─────┐
+                                      ▼                     │
+[Get Users] ─→ [SplitInBatches] ─→ [Send Email] ─→ [Wait] ──┘
+              
+SplitInBatches 输出当前批 → 下游处理 → 跑完后**控制流自动回到 SplitInBatches**
+SplitInBatches 检查还有没有下一批 → 有就再输出 → 没有就结束`}
+</TerminalCell>
+
+n8n 自动把 SplitInBatches 下游链条的"末端"接回 SplitInBatches。**不需要你手动连**。
+
+## 配合 Wait 节点限速
+
+Wait 节点让流程暂停 N 秒/分。配 SplitInBatches 是**严格限速**的标配：
+
+<TerminalCell filename="batches-wait.txt" runTag="⏰">
+{`需求：API 限 60 次/分
+
+策略 A · 一批一停
+  Batch Size = 60
+  Wait = 60 秒
+  → 每 60 个一组发，然后等 60 秒
+
+策略 B · 平摊
+  Batch Size = 1
+  Wait = 1.1 秒
+  → 一次一个，间隔 1.1 秒
+
+策略 A 简单粗暴；策略 B 平滑均匀。看 API 的 burst 政策选。`}
+</TerminalCell>
+
+## 知道每一批是第几批
+
+SplitInBatches 节点输出里有元数据：
+
+<TerminalCell filename="batch-metadata.txt" runTag="🔍">
+{`节点输出的每个 item 都有：
+  $json                      ← 该 item 原始字段
+  
+节点本身的特殊变量：
+  $('SplitInBatches').context.currentRunIndex   ← 当前是第几批（0 起）
+  $('SplitInBatches').context.noItemsLeft       ← 是不是最后一批
+
+实战：
+  ={{ $('SplitInBatches').context.currentRunIndex + 1 }} / {{ Math.ceil($('Get Users').all().length / 50) }}
+  → 输出 "3 / 20"（第 3 批，共 20 批）`}
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 误以为 SplitInBatches 能并行加速">
+  
+  SplitInBatches 是**降速**工具，不是加速。它让下游**串行**处理批次，每批跑完才下一批。如果你想加速，反而要**移除** SplitInBatches，让默认并发执行。
+  
+  真正能加速的：1) 优化下游节点本身；2) Queue mode（多 worker）。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  写一个 workflow：用 Code 节点生成 100 个 items（`[{i:1}, ..., {i:100}]`）→ SplitInBatches (size=10) → Wait 2s → Set（输出 "Processed batch X / 10"）。运行后看 Executions 时间线——应该恰好 20 秒（10 批 × 2s）。
+</TipCallout>
+
+## 本节要点回顾
+
+- SplitInBatches = 把大数组切成小批次，**串行**让下游处理
+- 主要用于**避免 API 限流**
+- 经典搭档：SplitInBatches + Wait → 严格速率控制
+- 它**不是并发加速**，是降速保护
+- 用 `context.currentRunIndex` 查"第几批"
+
+下一节[Loops 循环模式](../loops/)——n8n 里其他几种循环写法。

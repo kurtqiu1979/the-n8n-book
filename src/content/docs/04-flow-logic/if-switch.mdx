@@ -1,0 +1,152 @@
+---
+title: IF / Switch · 条件分支
+description: 让工作流根据数据走不同分支 —— IF（二选一）和 Switch（多选一）的正确用法
+sidebar:
+  order: 2
+  label: 4.1 IF / Switch
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 4 章 · 第 1 节</span>
+
+线性工作流（A → B → C）只能解决一类场景。**真实业务**永远充满"如果……否则……"——这一节讲 IF 和 Switch 两个最常用的分支节点。
+
+## IF 节点：二分
+
+IF 节点判断一个条件，输出两条线：**True**（走 ✓ 口）和 **False**（走 ✗ 口）。
+
+<TerminalCell filename="if-canvas.txt" runTag="🔀">
+{`              ┌─── True ──→ [Send Notification]
+[Get Data] ──▶│ IF (条件)│
+              └── False ──→ [Log Error]`}
+</TerminalCell>
+
+### 配置示例
+
+<TerminalCell filename="if-config.txt" runTag="⚙">
+{`Conditions:  Number
+  Value 1:    {{ $json.score }}
+  Operator:   >
+  Value 2:    60
+
+Combine:  AND   (多个条件时的合并方式)`}
+</TerminalCell>
+
+### 支持的比较类型
+
+| 数据类型 | 操作符 |
+|---|---|
+| **Number** | `=`、`≠`、`>`、`<`、`≥`、`≤` |
+| **String** | `=`、`≠`、`contains`、`starts with`、`ends with`、`is empty`、`regex match` |
+| **Boolean** | `is true`、`is false` |
+| **Date & Time** | `is before`、`is after`、`is exactly` |
+| **Array / Object** | `is empty`、`contains`、`length =` |
+
+### 多条件：AND vs OR
+
+可以加多个条件，用 **AND** 或 **OR** 合并。AND = 全都满足；OR = 任一满足。
+
+<TerminalCell filename="multi-condition.txt" runTag="🎯">
+{`场景：只通知 VIP 用户且积分 > 100 的
+
+Conditions:  AND
+  - {{ $json.tier }}  =  "VIP"
+  - {{ $json.score }} >  100
+
+或者（OR）：高积分用户 或 VIP 用户都通知
+Conditions:  OR
+  - {{ $json.tier }}  =  "VIP"
+  - {{ $json.score }} >  500`}
+</TerminalCell>
+
+## Switch 节点：多分
+
+Switch 像 `switch...case` 语句——根据一个值匹配多个分支：
+
+<TerminalCell filename="switch-canvas.txt" runTag="🔀">
+{`                ┌── case "pro"   ──→ [Pro Workflow]
+[Get User] ───▶ │ Switch │── case "free"  ──→ [Free Workflow]
+                │  $json │── case "trial" ──→ [Trial Workflow]
+                │  .tier │── fallback     ──→ [Default Workflow]
+                └────────┘`}
+</TerminalCell>
+
+### 两种模式
+
+| Mode | 说明 |
+|---|---|
+| **Rules** | 每个分支独立写规则（最灵活） |
+| **Expression** | 根据一个表达式的求值结果分发到对应输出口 |
+
+**Rules 模式**（推荐）：
+
+<TerminalCell filename="switch-rules.txt" runTag="⚙">
+{`Mode: Rules
+Output 0:
+  Conditions:  {{ $json.tier }} = "pro"
+Output 1:
+  Conditions:  {{ $json.tier }} = "free"
+Output 2:
+  Conditions:  {{ $json.tier }} = "trial"
+
+Fallback Output:  Extra Output  (没匹配上的走最后一个)`}
+</TerminalCell>
+
+## IF vs Switch · 何时用哪个
+
+| 场景 | 用 |
+|---|---|
+| 是 / 否 二分 | **IF** |
+| 多个互斥的分支（按某字段值） | **Switch** |
+| 多个**并行**条件（不一定互斥） | 多个 IF 并联，或用 Filter 节点 |
+
+## 一些常见模式
+
+### 模式 1 · 早返回
+
+<TerminalCell filename="early-return.txt" runTag="📍">
+{`[Webhook] → [IF (数据合法?)] ──┬── True ──→ 继续处理
+                                └── False ──→ [Stop and Error]
+                                              直接停止，避免污染下游`}
+</TerminalCell>
+
+### 模式 2 · 数据分流
+
+<TerminalCell filename="split-routing.txt" runTag="📍">
+{`[Get Orders] → [Switch (按订单金额)]
+                  ├── < $100      → [Standard Process]
+                  ├── $100~$1000  → [Manager Approval]
+                  └── > $1000     → [VP Approval]`}
+</TerminalCell>
+
+### 模式 3 · IF + Merge（两条线合流）
+
+<TerminalCell filename="if-merge.txt" runTag="📍">
+{`[Get User] → [IF (paid?)] ── True ──→ [Add Premium Badge] ──┐
+                          └─ False ──→ [Add Free Badge]    ─┤── Merge ── [Send Email]
+                                                            ┘
+两条线都跑完后用 Merge 合流，再走下游。`}
+</TerminalCell>
+
+<TipCallout type="warn" title="新手坑 · IF 后只有一边有 item，下游空跑">
+  
+  IF 节点会把 items 分到两边。如果你的 IF 条件让**全部 items 都走 True**，那 False 那条线下游收到 0 个 items —— 那些节点**仍然会被"执行"**（即使是 0 次迭代），但不会有真正的工作发生。
+  
+  这通常没问题，但如果你在 False 分支放了"删除文件"之类的副作用操作，**它在 0 items 下其实不会真的删**——容易让人误以为出 bug。Pin data 调试能帮你确认。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  写一个 workflow：从 Manual Trigger 输出 5 个 items（每个含 `score` 字段 0-100），用 Switch 分流到三档：低（&lt;60）/ 中（60-80）/ 高（&gt;80），每档跟一个 Set 节点加上等级标签。看输出。
+</TipCallout>
+
+## 本节要点回顾
+
+- IF = 二分；Switch = 多分（一对多）
+- 多条件用 AND（全满足）或 OR（任一满足）
+- IF 后空 items 下游会"执行 0 次"，副作用节点要小心
+- 复杂分流用 Switch，避免 IF 套 IF 套 IF
+
+下一节[Merge 节点](../merge/)——把分开的支流合回来，这是 IF 后续最常见的搭档。

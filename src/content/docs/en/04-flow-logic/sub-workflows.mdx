@@ -1,0 +1,184 @@
+---
+title: Sub-workflows · Workflows as "Functions"
+description: Extract reusable logic — cleaner main flows, multi-place reuse, testable in isolation
+sidebar:
+  order: 7
+  label: 4.6 Sub-workflows
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 4 · Section 6</span>
+
+In code we extract functions; same in n8n. Logic that recurs across workflows should become a reusable unit. That's **Sub-workflows** — main workflows become small "callers" that orchestrate other workflows.
+
+## Why sub-workflows
+
+| Pain | Sub-workflow cure |
+|---|---|
+| Same logic copy-pasted in 5 workflows | One sub-workflow, called from 5 places |
+| Main workflow too long, canvas spaghetti | Extract branches, main stays clean |
+| Unit needs independent testing | Sub-workflow tests with Test workflow |
+| Team collaboration, logic boundaries | Each sub-workflow has an owner |
+
+## Create a Sub-workflow
+
+Same as any workflow, but the trigger is **Execute Sub-workflow Trigger**:
+
+<TerminalCell filename="sub-workflow-recipe.txt" runTag="🧩">
+{`Sub-workflow: "Send Slack Alert"
+
+[Execute Sub-workflow Trigger]  ← entry
+  Input fields:
+    - title    (string)
+    - message  (string)
+    - severity (string: info / warn / error)
+   ↓
+[Format Message]
+   ↓
+[Slack]
+   ↓
+[Return]  ← optionally return data to caller`}
+</TerminalCell>
+
+The entry node defines a "parameter list" — like a function signature.
+
+## Call from main workflow
+
+Use **Execute Workflow** node:
+
+<TerminalCell filename="execute-workflow.txt" runTag="📞">
+{`Main workflow:
+  ... → [Execute Workflow] → ...
+        Workflow: "Send Slack Alert"  ← dropdown picks sub-workflow
+        Inputs:
+          title:    ={{ "Order Failed" }}
+          message:  ={{ $json.errorMsg }}
+          severity: error
+
+Runtime:
+  Execute Workflow takes over → calls sub-workflow → waits for return → places output
+
+The main workflow sees the sub-workflow's return data on Execute Workflow's output.`}
+</TerminalCell>
+
+## Three call modes
+
+<TerminalCell filename="three-modes.txt" runTag="🎛">
+{`Execute Workflow's "Mode" has three options:
+
+1. Run once with all items
+   Main has 100 items → sub-workflow called 1 time with the whole array
+   
+2. Run once for each item   (default)
+   Main has 100 items → sub-workflow called 100 times, 1 item each
+   
+3. Run via Webhook
+   Treat sub-workflow as an HTTP API (async, cross-instance)`}
+</TerminalCell>
+
+**Beginner default: "Run once for each item"** — consistent with other nodes' iteration behavior.
+
+## Classic uses
+
+### A · Universal notifier
+
+<TerminalCell filename="notify-subwf.txt" runTag="📢">
+{`Sub-workflow: "Notify"
+  Input: { channel, message, severity }
+  Logic:
+    severity=error → Slack #alerts (red)
+    severity=warn  → Slack #ops    (yellow)
+    severity=info  → Slack #updates (blue)
+
+Main workflows that need to notify → Execute Workflow "Notify" + pass args
+No more copying Slack formatting logic everywhere`}
+</TerminalCell>
+
+### B · Universal record saver
+
+<TerminalCell filename="save-record.txt" runTag="💾">
+{`Sub-workflow: "Save Record"
+  Input: { table, data }
+  Logic:
+    - validate fields
+    - add timestamp / created_by
+    - write Postgres
+    - mirror to Notion (backup)
+
+Three different-entry workflows (Webhook / Schedule / Manual) all call it`}
+</TerminalCell>
+
+### C · Divide and conquer
+
+<TerminalCell filename="divide-conquer.txt" runTag="✂">
+{`Main workflow (clean):
+  [Webhook] → [Execute Workflow "Validate"]
+            → [Execute Workflow "Enrich"]
+            → [Execute Workflow "Save"]
+            → [Execute Workflow "Notify"]
+
+Each sub-workflow has 5-10 nodes, focused. Main looks like pseudocode.`}
+</TerminalCell>
+
+## Conventions
+
+<TerminalCell filename="sub-conventions.txt" runTag="📐">
+{`Naming:
+  ✅ [sub] Send Slack Alert        ← prefix marks sub-workflow
+  ✅ [util] Validate Email
+  
+Return shape:
+  - Success: { success: true, data: ... }
+  - Failure: { success: false, error: "..." }
+  
+Consistent signatures make calling code uniform.`}
+</TerminalCell>
+
+## Limits and traps
+
+<TipCallout type="warn" title="Trap 1 · Credential scope">
+  
+  Sub-workflows use **their own** configured credentials, not the caller's. If the main workflow's owner differs from the sub-workflow's owner, credentials may not be shared — sub-workflow fails.
+  
+  **Fix:** sub-workflow's credentials → Sharing → add all users/groups that call it.
+  
+</TipCallout>
+
+<TipCallout type="warn" title="Trap 2 · Recursive risk">
+  
+  Sub-workflow calling itself (directly or via chain) = recursion. n8n doesn't auto-detect infinite recursion — it'll run until timeout or resource exhaustion.
+  
+  **Fix:** every recursion adds a counter + termination condition. Ensure a "base case" returns.
+  
+</TipCallout>
+
+<TipCallout type="warn" title="Trap 3 · Debugging">
+  
+  In the main workflow's execution history you only see "Execute Workflow ran N times" — **not** the sub-workflow's internal execution detail. To debug internals, open the sub-workflow and check its own Executions tab.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  
+  Convert §4.5's "Global Error Handler" into a sub-workflow:
+  
+  1. Replace the entry with Execute Sub-workflow Trigger
+  2. Define inputs: `workflowName`, `errorMessage`, `failedNodeName`
+  3. The main flow's Error Trigger receives the error, then calls this sub-workflow with the args
+  
+  Benefit: changing notification channels means editing this one sub-workflow only.
+  
+</TipCallout>
+
+## Section recap
+
+- Sub-workflow = workflow as a "function"
+- Entry uses Execute Sub-workflow Trigger; **define the parameter list**
+- Main workflow uses Execute Workflow to call
+- Three modes: all-items / each-item (default) / webhook
+- Use conventions (name prefix + return shape) for team reuse
+- Watch out: credential scope, recursion, debugging requires switching workflow
+
+You've finished **Part 4**. Next is the fun part: [Part 5 · AI & Agents](../../05-ai-agents/overview/).
