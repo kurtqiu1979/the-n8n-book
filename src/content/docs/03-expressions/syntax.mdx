@@ -1,0 +1,158 @@
+---
+title: 表达式语法入门 · {{ }} 与 fx 模式
+description: 弄清楚什么时候用表达式、怎么切换两种模式、表达式编辑器怎么用
+sidebar:
+  order: 2
+  label: 3.1 表达式语法
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 3 章 · 第 1 节</span>
+
+表达式是 n8n 给静态节点装上的**动态引擎**。学会用它，节点的参数就能根据上游数据自动变化——这是从"写死的工作流"升级到"智能的工作流"的关键一跃。
+
+## 两种模式：固定值 vs 表达式
+
+每个节点参数输入框都有一个 `fx` 小按钮（右上角）。点一下切换：
+
+<TerminalCell filename="fixed-vs-expr.txt" runTag="🔀">
+{`【固定值模式】
+  输入：  Hello World
+  发送：  Hello World        （字面量，不解释）
+
+  输入：  {{ $json.name }}
+  发送：  {{ $json.name }}    （依然是字面量，不执行）
+
+【表达式模式 fx】
+  输入：  ={{ $json.name }}
+  发送：  Alice               （执行后的结果）
+
+  输入：  =Hello {{ $json.name }}!
+  发送：  Hello Alice!         （混合字面量 + 表达式）`}
+</TerminalCell>
+
+**记忆口诀**：表达式模式下的字符串**以 `=` 开头**——n8n 看到 `=` 才知道"这一整串里可能含表达式，扫一遍"。固定值模式下整串原样发送。
+
+## `{{ ... }}` 的内部是 JavaScript
+
+`{{ ... }}` 双花括号里写**任意 JavaScript 表达式**，不是某种自定义 DSL：
+
+<TerminalCell filename="js-expressions.txt" runTag="💻">
+{`{{ 1 + 1 }}                            →  2
+{{ "hello".toUpperCase() }}            →  HELLO
+{{ [1,2,3].reduce((a,b)=>a+b) }}       →  6
+{{ new Date().getFullYear() }}         →  2026
+{{ true && 'yes' }}                    →  yes
+{{ $json.x > 10 ? 'big' : 'small' }}   →  big / small`}
+</TerminalCell>
+
+整个 JS 标准库都能用。所以表达式 ≈ JavaScript 的 inline 模板。
+
+## n8n 内建变量速查
+
+`{{ }}` 里可以用普通 JS 变量名（其实是 n8n 注入的全局对象）：
+
+| 变量 | 含义 |
+|---|---|
+| `$json` | 当前正在处理的 Item 的 JSON |
+| `$('NodeName')` | 引用另一个节点（拿它的输出） |
+| `$node['NodeName']` | 同上，老语法（已不推荐） |
+| `$now` | 当前时间（Luxon DateTime 对象） |
+| `$today` | 今天 00:00（Luxon DateTime） |
+| `$workflow` | 当前 workflow 元信息（id/name/active） |
+| `$execution` | 本次 execution 元信息（id/mode） |
+| `$env` | 环境变量（自托管才有） |
+| `$input` | 节点的输入（多输入节点常用） |
+| `$itemIndex` | 当前 item 在数组里的下标（从 0 起） |
+
+## 表达式编辑器（点 fx 后的弹出框）
+
+很多输入框点 fx 后会弹出一个**表达式编辑器**——左边写表达式，右边实时显示求值结果。这是新手最该学会的工具：
+
+<TerminalCell filename="expr-editor.txt" runTag="✏">
+{`┌──────────────────────────┬─────────────────────┐
+│  Expression               │  Result              │
+│                           │                      │
+│  Hello {{ $json.name }}!  │  Hello Alice!         │
+│                           │                      │
+│  {{ $now.toISO() }}       │  2026-05-13T10:23..  │
+│                           │                      │
+│  {{ $json.age + 1 }}      │  31                  │
+└──────────────────────────┴─────────────────────┘
+
+错误时右边会显示红色错误信息，方便定位。`}
+</TerminalCell>
+
+**调试任何表达式都先在这里跑通**，再放回节点里。
+
+## 表达式的 3 个进阶语法
+
+### 1 · 多行表达式（IIFE）
+
+`{{ ... }}` 里只允许写**表达式**，不能写 `if`/`for`。但可以包一个立即执行函数：
+
+<TerminalCell filename="iife-expr.txt" runTag="🎯">
+{`{{ 
+  (() => {
+    const items = $json.items;
+    let total = 0;
+    for (const it of items) total += it.price;
+    return total;
+  })()
+}}`}
+</TerminalCell>
+
+但这么写就太丑了——**复杂逻辑用 Code 节点**。
+
+### 2 · 字符串里嵌多个表达式
+
+<TerminalCell filename="multi-expr.txt" runTag="🎯">
+{`=Hello {{ $json.first }} {{ $json.last }}, you are {{ $json.age }} years old.`}
+</TerminalCell>
+
+每个 `{{ }}` 单独求值，结果拼回字符串。
+
+### 3 · 表达式调用 n8n 内置工具函数
+
+n8n 注入了一些便捷工具：
+
+<TerminalCell filename="helpers.txt" runTag="🔧">
+{`{{ $now.minus({ days: 7 }).toISO() }}        →  7 天前的 ISO 时间
+{{ $jmespath($json, 'items[*].name') }}      →  JMESPath 查询
+{{ $randomString(8) }}                       →  随机 8 位串
+{{ $fromAI('field', 'description') }}        →  在 AI Tool 节点里取参数`}
+</TerminalCell>
+
+## 何时**该**用表达式、何时**不该**
+
+| ✅ 该用 | ❌ 不该用 |
+|---|---|
+| URL/路径里插入上游数据 | 表达式里写超过 3 行逻辑（用 Code 节点） |
+| 字段值动态拼接 | 多分支判断（用 IF / Switch 节点） |
+| 简单条件值（三元运算符） | 数据库查询（用 SQL 节点） |
+| 时间/字符串格式化 | 循环大数据（用 SplitInBatches） |
+
+<TipCallout type="warn" title="新手最大的迷惑 · 为什么我的表达式没生效？">
+  
+  最常见的两个原因：
+  
+  1. **没点 fx 切换到表达式模式** —— 输入框背景没变粉，表达式被当字面量
+  2. **缺少 `=` 前缀** —— 表达式模式下字符串必须以 `=` 开头才会解析（编辑器自动加，手填 JSON 时容易漏）
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  在你的 Hello World workflow 里加一个 Set 节点，给一个字段设值：`=今天是 {{ $now.toFormat('yyyy 年 MM 月 dd 日') }}`。看看输出是不是当天日期。
+</TipCallout>
+
+## 本节要点回顾
+
+- 两种模式：固定值（字面量）vs 表达式 fx（动态求值）
+- 表达式模式下字符串以 `=` 起头，`{{ ... }}` 内是任意 JavaScript
+- n8n 注入的全局变量：`$json` / `$('Name')` / `$now` / `$workflow` 等
+- 调试表达式去**表达式编辑器**实时看结果
+- 复杂逻辑用 Code 节点；多分支用 IF/Switch
+
+下一节深入讲[引用其他节点数据的语法细节](../data-refs/)。

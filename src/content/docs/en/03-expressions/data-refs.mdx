@@ -1,0 +1,158 @@
+---
+title: Data References · $json / $() / .first() / .all()
+description: How to precisely grab data from any node — six common patterns
+sidebar:
+  order: 3
+  label: 3.2 Data References
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 3 · Section 2</span>
+
+80% of expression work is "which node's data do I want, and which item?" This section consolidates every reference pattern.
+
+## Cheat sheet (memorize this)
+
+<TerminalCell filename="ref-cheatsheet.txt" runTag="📑">
+{`Reference the previous node's current item:
+  $json                       → current item's JSON
+  $json.fieldName             → its fieldName
+  $binary                     → its binary attachments
+
+Reference any node:
+  $('NodeName').item          → current iteration's paired item (smart)
+  $('NodeName').first()       → first item
+  $('NodeName').last()        → last item
+  $('NodeName').all()         → all items array
+  $('NodeName').itemMatching(idx)  → by index
+
+After each, .json / .binary:
+  $('Sheets').first().json.email
+  $('Sheets').all()[0].json.email`}
+</TerminalCell>
+
+## `$json` — most common, but local
+
+`$json` is **always the current item the current node is processing**.
+
+<TerminalCell filename="json-scope.txt" runTag="🎯">
+{`Scenario: HTTP Request returns 3 users; the downstream Set iterates 3 times.
+
+Iteration 1:  $json = { name: "Alice", id: 1 }
+Iteration 2:  $json = { name: "Bob",   id: 2 }
+Iteration 3:  $json = { name: "Carol", id: 3 }
+
+Set value:  ={{ $json.name }}'s ID is {{ $json.id }}
+
+Output:
+  Alice's ID is 1
+  Bob's ID is 2
+  Carol's ID is 3`}
+</TerminalCell>
+
+`$json` only sees the **immediately upstream** node. Beyond that, use `$('Name')`.
+
+## `$('NodeName')` — cross-node
+
+The node name is its display name on the canvas. Spaces/special chars are fine (just quote them).
+
+<TerminalCell filename="cross-node.txt" runTag="🔗">
+{`workflow:  [Get Users] → [Filter Active] → [Send Email]
+
+In Send Email:
+  $json                            ← Filter Active's current item
+  $('Get Users').first()           ← Get Users' first item
+  $('Get Users').all().length      ← total count
+  $('Get Users').first().json.id   ← first item's id`}
+</TerminalCell>
+
+## `.first()` / `.last()` / `.all()` — safest
+
+Always return a deterministic value, no iteration alignment required.
+
+<TerminalCell filename="first-last-all.txt" runTag="✅">
+{`.first()  → item at index 0
+.last()   → last item
+.all()    → entire array (aggregate, sum, count)
+
+Examples:
+  $('Sheets').first().json.email
+  $('Sheets').last().json.created_at
+  $('Sheets').all().length
+  $('Sheets').all().map(i => i.json.email).join(', ')`}
+</TerminalCell>
+
+**Beginners: prefer these three** over `.item`.
+
+## `.item` — smart but fragile
+
+Returns "the item paired with the current iteration." Works when 1:1 alignment exists; fails (or worse, silently uses wrong data) when nodes break the alignment (Merge, SplitInBatches).
+
+<TerminalCell filename="item-fails.txt" runTag="⚠">
+{`When Merge / SplitInBatches reorganizes data flow, n8n can't pair iterations.
+.item may either:
+  - throw "Couldn't find which item to use for this expression"
+  - silently fall back to item 0 (more dangerous)
+
+Solutions:
+  - Just need "first item"?     → use .first()
+  - Need pairing by index?      → use .itemMatching($itemIndex)
+  - Want smart pairing?         → keep flow 1:1 (avoid SplitInBatches in between)`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Always try .first() first">
+  When references go wrong, fall back to `.first()`. Once that proves reliable, decide if you really need per-item pairing.
+</TipCallout>
+
+## `.itemMatching(idx)` — by explicit index
+
+<TerminalCell filename="item-matching.txt" runTag="🎯">
+{`$('Sheets').itemMatching(0)              ← same as .first()
+$('Sheets').itemMatching($itemIndex)     ← manual pairing
+$('Sheets').itemMatching(5)              ← 6th item if exists`}
+</TerminalCell>
+
+## Binary data
+
+<TerminalCell filename="binary-ref.txt" runTag="📎">
+{`$binary                              ← all binary attachments
+$binary.image                        ← attachment named image
+$binary.image.data                   ← base64 content
+$binary.image.mimeType               ← mime type
+
+$('Read File').first().binary.data   ← cross-node binary`}
+</TerminalCell>
+
+## Decision tree
+
+<TerminalCell filename="decision-tree.txt" runTag="🌳">
+{`Q1: Is the source node the immediately previous one?
+    ├─ Yes → use $json
+    └─ No  → Q2
+
+Q2: How many items does the source emit?
+    ├─ Always one  → $('Name').first().json.x
+    ├─ Multiple, need all   → $('Name').all()
+    ├─ Multiple, need newest → $('Name').last()
+    └─ Multiple, pair w/ current iteration → Q3
+
+Q3: Is the data flow strictly 1:1 (no Merge/SplitInBatches)?
+    ├─ Yes → $('Name').item.json.x
+    └─ No  → $('Name').itemMatching($itemIndex).json.x`}
+</TerminalCell>
+
+<TipCallout type="quest" title="Extension challenge">
+  Build a 3-node flow: Manual Trigger → Set (emits 5 items with name/age) → second Set. In the second Set, simultaneously use `$json.name`, `$('Set').first().json.name`, `$('Set').last().json.name` and observe each.
+</TipCallout>
+
+## Section recap
+
+- `$json` for immediate upstream's current item
+- `$('NodeName')` + `.first/.last/.all` is the safest cross-node pattern
+- `.item` is smart but fragile — beginners default to `.first()`
+- `.itemMatching($itemIndex)` for explicit index-based pairing
+- Binary: `$binary` or `$('Name').first().binary`
+
+Next: [JS cheat sheet](../js-cheatsheet/).

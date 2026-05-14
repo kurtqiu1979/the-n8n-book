@@ -1,0 +1,121 @@
+---
+title: Expression Syntax · {{ }} and fx Mode
+description: When to use expressions, how to toggle modes, how to use the expression editor
+sidebar:
+  order: 2
+  label: 3.1 Syntax
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 3 · Section 1</span>
+
+Expressions are the **dynamic engine** bolted onto otherwise static nodes. Master them and your workflows can adapt to upstream data — the jump from "hardcoded" to "intelligent" workflows.
+
+## Two modes: fixed value vs expression
+
+Every input field has a small `fx` button (top right). Toggle to switch:
+
+<TerminalCell filename="fixed-vs-expr.txt" runTag="🔀">
+{`[Fixed-value mode]
+  Input:  Hello World
+  Sent:   Hello World        (literal)
+
+  Input:  {{ $json.name }}
+  Sent:   {{ $json.name }}    (still literal — not evaluated)
+
+[Expression mode (fx)]
+  Input:  ={{ $json.name }}
+  Sent:   Alice               (evaluated)
+
+  Input:  =Hello {{ $json.name }}!
+  Sent:   Hello Alice!         (mixed literal + expression)`}
+</TerminalCell>
+
+**Mnemonic:** an expression-mode string **starts with `=`** — that's how n8n knows to scan the whole string for `{{ }}` substitutions.
+
+## Inside `{{ ... }}` is JavaScript
+
+Any valid JavaScript expression works:
+
+<TerminalCell filename="js-expressions.txt" runTag="💻">
+{`{{ 1 + 1 }}                            →  2
+{{ "hello".toUpperCase() }}            →  HELLO
+{{ [1,2,3].reduce((a,b)=>a+b) }}       →  6
+{{ new Date().getFullYear() }}         →  2026
+{{ $json.x > 10 ? 'big' : 'small' }}   →  big / small`}
+</TerminalCell>
+
+## n8n built-in globals
+
+| Variable | Meaning |
+|---|---|
+| `$json` | The current Item being processed |
+| `$('NodeName')` | Reference to another node's output |
+| `$now` | Current time (Luxon DateTime) |
+| `$today` | Today at 00:00 |
+| `$workflow` | Current workflow meta (id / name / active) |
+| `$execution` | Current execution meta (id / mode) |
+| `$env` | Environment variables (self-host only) |
+| `$itemIndex` | Current item's index in the array |
+
+## Expression editor
+
+Click `fx` and a panel pops up — left is your expression, right is the live evaluation. **Always debug expressions here first** before pasting into the actual field.
+
+## Three advanced bits
+
+### 1 · IIFE for multi-line logic
+
+`{{ ... }}` only accepts expressions, not statements. Wrap in an immediately-invoked function:
+
+<TerminalCell filename="iife.txt" runTag="🎯">
+{`{{ 
+  (() => {
+    const items = $json.items;
+    let total = 0;
+    for (const it of items) total += it.price;
+    return total;
+  })()
+}}`}
+</TerminalCell>
+
+But this is ugly — **use the Code node for real logic**.
+
+### 2 · Multiple expressions in one string
+
+```
+=Hello {{ $json.first }} {{ $json.last }}, age {{ $json.age }}.
+```
+
+### 3 · Built-in helpers
+
+<TerminalCell filename="helpers.txt" runTag="🔧">
+{`{{ $now.minus({ days: 7 }).toISO() }}        →  ISO string for 7 days ago
+{{ $jmespath($json, 'items[*].name') }}      →  JMESPath query
+{{ $randomString(8) }}                       →  Random 8-char string`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Top confusion: why isn't my expression evaluating?">
+  
+  Two most common causes:
+  
+  1. **Didn't click `fx`** — input still in fixed-value mode
+  2. **Missing `=` prefix** — expression-mode strings must begin with `=`
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Add a Set node to your Hello World workflow with field `=Today is {{ $now.toFormat('MMMM d, yyyy') }}`. Verify the output matches today's date.
+</TipCallout>
+
+## Section recap
+
+- Two modes: fixed value vs expression (`fx` toggle)
+- Expression-mode strings start with `=`; `{{ ... }}` is JavaScript
+- Globals: `$json` / `$('Name')` / `$now` / `$workflow` / `$execution`
+- Debug in the **expression editor**
+- Complex logic → Code node; multi-branch → IF / Switch
+
+Next: [data reference patterns](../data-refs/).

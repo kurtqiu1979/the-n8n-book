@@ -1,0 +1,229 @@
+---
+title: 类型转换与日期处理 · 把最容易踩坑的细节吃透
+description: 字符串变数字、布尔判断、时区、格式化 —— 表达式里最容易翻车的部分
+sidebar:
+  order: 5
+  label: 3.4 类型与日期
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 3 章 · 第 4 节</span>
+
+写表达式时**60% 的"为什么结果不对"都是类型问题**。这一节专门讲：JS 的类型陷阱、n8n 的类型自动转换习惯、日期时区的坑。
+
+## JS 的类型陷阱（先复习）
+
+<TerminalCell filename="js-quirks.txt" runTag="⚠">
+{`// 字符串和数字混合
+"3" + 2           →  "32"          (字符串拼接！)
+"3" - 2           →  1             (减号会强制转数字)
+"3" * 2           →  6
+Number("3") + 2   →  5
+
+// 真值判断
+Boolean(0)        →  false
+Boolean("")       →  false
+Boolean("0")      →  true          (注意！非空字符串都是 true)
+Boolean("false")  →  true          (字符串 "false" 也是 true!)
+Boolean(null)     →  false
+Boolean(undefined)→  false
+Boolean([])       →  true          (空数组也是 true)
+Boolean({})       →  true          (空对象也是 true)
+
+// 相等比较
+"3" == 3          →  true          (== 会强转，别用)
+"3" === 3         →  false         (=== 严格比较，推荐)
+null == undefined →  true          (== 唯一例外)
+null === undefined→  false`}
+</TerminalCell>
+
+**永远用 `===` 比较**，别用 `==`。
+
+## n8n 字段类型常见来源
+
+每个上游节点输出的字段类型不同，**经常需要显式转换**：
+
+<TerminalCell filename="common-types.txt" runTag="🔤">
+{`数据源                  字段                  类型
+─────                  ────                  ────
+Google Sheets         单元格               string（即使是数字！）
+Webhook query string  ?id=123              string
+Webhook JSON body     { "id": 123 }        number
+Database (SQL)        数字字段             number
+Database (SQL)        日期字段             ISO string
+Manual Trigger        无                   $json 是 {}
+
+教训：从 Sheets / Webhook query 来的数字，必须先转！`}
+</TerminalCell>
+
+## 安全的类型转换
+
+<TerminalCell filename="type-cast.txt" runTag="🔁">
+{`// 字符串 → 数字
+Number("123")                    →  123
+Number("123abc")                 →  NaN              (不是 0！)
+parseInt("123abc")               →  123
+parseFloat("12.5kg")             →  12.5
+
+// 处理 NaN
+Number("abc") || 0               →  0                (兜底)
+Number("0") || 0                 →  0                (注意 "0" 转出来是 0，假值！)
+isNaN(Number("abc"))             →  true             (判断转失败)
+
+// 数字 → 字符串
+String(123)                      →  "123"
+(123).toString()                 →  "123"
+\`\${123}\`                         →  "123"
+
+// 任意 → 布尔
+Boolean("hello")                 →  true
+!!"hello"                        →  true             (简写)
+!!""                             →  false
+
+// 字符串 → 布尔（严格意义上的解析）
+"true" === "true"                →  true
+JSON.parse("true")               →  true
+JSON.parse("false")              →  false`}
+</TerminalCell>
+
+## 日期处理：用 Luxon
+
+n8n 注入了 [Luxon](https://moment.github.io/luxon/) —— 现代 JS 的日期库。**不要用原生 `new Date()`**，除非你乐意调时区 bug。
+
+### 获取当前时间
+
+<TerminalCell filename="luxon-now.txt" runTag="📅">
+{`$now                             →  Luxon DateTime（当前时刻，含 n8n 实例时区）
+$today                           →  今天 00:00
+$now.toISO()                     →  "2026-05-13T10:23:45.123+08:00"
+$now.toUTC()                     →  转 UTC
+$now.toMillis()                  →  Unix 毫秒时间戳
+$now.toSeconds()                 →  Unix 秒时间戳`}
+</TerminalCell>
+
+### 解析字符串
+
+<TerminalCell filename="luxon-parse.txt" runTag="📅">
+{`// ISO 字符串
+DateTime.fromISO("2026-05-13T10:23:45Z")
+
+// 自定义格式
+DateTime.fromFormat("13/05/2026", "dd/MM/yyyy")
+DateTime.fromFormat("2026 年 5 月 13 日", "yyyy 年 M 月 d 日", { locale: "zh-CN" })
+
+// Unix 时间戳
+DateTime.fromMillis(1715000000000)
+DateTime.fromSeconds(1715000000)
+
+// 检查解析是否成功
+const dt = DateTime.fromISO("invalid")
+dt.isValid                       →  false
+dt.invalidReason                 →  "unparsable"`}
+</TerminalCell>
+
+### 加减、起止
+
+<TerminalCell filename="luxon-math.txt" runTag="📅">
+{`$now.plus({ days: 7 })           →  7 天后
+$now.plus({ hours: 3, minutes: 30 })
+$now.minus({ months: 1 })        →  1 个月前
+
+$now.startOf("day")              →  今天 00:00:00
+$now.startOf("month")            →  本月 1 号 00:00
+$now.startOf("week")             →  本周一 00:00
+$now.endOf("day")                →  今天 23:59:59.999
+
+// 两个时间差
+const d1 = $now
+const d2 = $now.minus({ days: 3 })
+d1.diff(d2, "days").days         →  3
+d1.diff(d2, ["days", "hours"])   →  { days: 3, hours: 0 }`}
+</TerminalCell>
+
+### 格式化输出
+
+<TerminalCell filename="luxon-format.txt" runTag="📅">
+{`$now.toFormat("yyyy-MM-dd")            →  "2026-05-13"
+$now.toFormat("HH:mm:ss")              →  "10:23:45"
+$now.toFormat("yyyy-MM-dd HH:mm")      →  "2026-05-13 10:23"
+$now.toFormat("yyyy 年 M 月 d 日")       →  "2026 年 5 月 13 日"
+$now.toFormat("EEEE")                  →  "Wednesday"
+$now.toFormat("EEEE", { locale: "zh-CN" }) →  "星期三"
+
+// ISO 各种变体
+$now.toISO()                           →  完整 ISO
+$now.toISODate()                       →  只日期 "2026-05-13"
+$now.toISOTime()                       →  只时间`}
+</TerminalCell>
+
+### 时区切换
+
+<TerminalCell filename="luxon-tz.txt" runTag="🌍">
+{`// 切到指定时区
+$now.setZone("Asia/Shanghai")          →  上海时区
+$now.setZone("America/New_York")       →  纽约时区
+$now.setZone("UTC")                    →  UTC
+
+// 查看当前时区
+$now.zoneName                          →  "Asia/Shanghai"
+$now.offset                            →  480 (UTC+8 分钟数)`}
+</TerminalCell>
+
+<TipCallout type="warn" title="时区最大坑 · n8n 默认 UTC">
+  n8n Cloud 默认 UTC。如果你在 Schedule 触发器写 "9:00 跑"，但你想要的是"北京 9:00"，那要么改实例 timezone（`GENERIC_TIMEZONE=Asia/Shanghai`），要么在 cron 里写 UTC 时间 `0 1 * * *`。一定先确认 `$now.zoneName` 是不是你想要的。
+</TipCallout>
+
+## 一些常翻车的小问题
+
+### 问题 1 · "我从 Sheets 读出来的数字加 1 变成字符串拼接"
+
+<TerminalCell filename="trap-sheets.txt" runTag="❌">
+{`从 Sheets 来：$json.count = "5"  (字符串！)
+
+错误写法：
+  ={{ $json.count + 1 }}           →  "51"   ❌
+
+正确写法：
+  ={{ Number($json.count) + 1 }}   →  6      ✅
+  ={{ +$json.count + 1 }}          →  6      ✅ (前缀 + 是简写)`}
+</TerminalCell>
+
+### 问题 2 · "字段可能不存在导致整个表达式爆"
+
+<TerminalCell filename="trap-missing.txt" runTag="❌">
+{`错误：
+  ={{ $json.user.email.toLowerCase() }}
+  → 当 user 或 email 缺失时：TypeError: Cannot read properties of undefined
+
+正确：
+  ={{ $json.user?.email?.toLowerCase() ?? '(no email)' }}
+  → 安全链 + 默认值`}
+</TerminalCell>
+
+### 问题 3 · "对象用 == 比较结果不对"
+
+<TerminalCell filename="trap-object-eq.txt" runTag="❌">
+{`错误：
+  ={{ $json.tags == ['a', 'b'] }}         →  false (对象比较引用，不比值)
+
+正确：
+  ={{ JSON.stringify($json.tags) === JSON.stringify(['a', 'b']) }}  ✅
+  或用 lodash isEqual（Code 节点里可用）`}
+</TerminalCell>
+
+<TipCallout type="quest" title="扩展挑战">
+  在 n8n 表达式编辑器里跑：`$now.minus({ years: 1 }).toFormat('yyyy-MM-dd')` —— 看看返回值。然后改成 `$now.setZone('America/New_York').minus({ years: 1 }).toISO()` —— 对比时区差。
+</TipCallout>
+
+## 本节要点回顾
+
+- 用 `===` 比较，**不**用 `==`
+- 字符串/数字常需显式 `Number()` 转换（特别从 Sheets / Webhook query）
+- 安全取字段：`obj?.field ?? '默认'`
+- 日期处理用 **Luxon**：`$now`/`DateTime.fromISO()`/`.plus({})`/`.toFormat()`
+- 时区：检查 `$now.zoneName`，需要时 `.setZone()`
+- 跨字段相等比较用 `JSON.stringify()`
+
+下一节[新手 5 大表达式坑](../beginner-traps/)——把最痛的几个 case 集中亮相，让你提前免疫。

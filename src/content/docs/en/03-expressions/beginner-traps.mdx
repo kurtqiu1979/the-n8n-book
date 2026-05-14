@@ -1,0 +1,182 @@
+---
+title: The Five Beginner Traps · Inoculate Yourself
+description: 5 real cases + antidotes — avoid 80% of expression problems
+sidebar:
+  order: 6
+  label: 3.5 Five Traps
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 3 · Section 5</span>
+
+80% of expression questions on the n8n forum trace back to five recurring pits. This section shows all five — once you've seen them, you'll spot them in your own work.
+
+## Trap 1 · Forgot to toggle expression mode (most common)
+
+<TerminalCell filename="trap-1.txt" runTag="❌">
+{`Scenario: HTTP Request, URL = dynamic $json.id
+
+Input:  https://api.com/users/{{ $json.id }}
+
+Expected: https://api.com/users/123
+Actual:   https://api.com/users/{{ $json.id }}  ← literal
+Result:   404 Not Found
+
+Cause: input field still in fixed-value mode. fx not clicked.
+
+Fix:
+  1. Hover the URL input → click fx in top right
+  2. Background goes pink, top-left shows "Expression"
+  3. Retype {{ $json.id }} → evaluates correctly
+
+Mantra:  "Expression not working? Check the background color."`}
+</TerminalCell>
+
+## Trap 2 · `.item` fails (when Merge / SplitInBatches in flow)
+
+<TerminalCell filename="trap-2.txt" runTag="❌">
+{`Scenario:
+  [Get Users (5 items)] → [SplitInBatches (size=2)] → [Send Email]
+
+  Send Email "To" field:  ={{ $('Get Users').item.json.email }}
+
+Error:  "Couldn't find which item to use for this expression"
+
+Cause: SplitInBatches reorganized the flow. n8n can't pair
+       "Send Email's current iteration" with a specific Get Users item.
+
+Fix A (recommended): use .first()
+  ={{ $('Get Users').first().json.email }}
+
+Fix B: use $json (immediate upstream is already SplitInBatches output)
+  ={{ $json.email }}
+
+Fix C: use .itemMatching($itemIndex)
+  ={{ $('Get Users').itemMatching($itemIndex).json.email }}
+
+Mantra: ".item is smart, but smart isn't always right."`}
+</TerminalCell>
+
+## Trap 3 · Number field surprisingly a string
+
+<TerminalCell filename="trap-3.txt" runTag="❌">
+{`Scenario: Google Sheets has "price" column
+
+Actual data:
+  [
+    { product: "A", price: "9.99" },    ← STRING
+    { product: "B", price: "19.99" }
+  ]
+
+Wrong:
+  ={{ $json.price + 0.01 }}            →  "9.990.01"   ❌
+
+Right:
+  ={{ Number($json.price) + 0.01 }}    →  10           ✅
+  ={{ parseFloat($json.price) + 0.01 }}→  10           ✅
+  ={{ +$json.price + 0.01 }}           →  10           ✅
+
+Source type rules of thumb:
+  Sheets cells          → string
+  Webhook query         → string
+  Webhook JSON body     → preserves types
+  Postgres / MySQL      → preserves types
+
+Mantra: "Plus gives string concat? Forgot Number()."`}
+</TerminalCell>
+
+## Trap 4 · Nested field undefined crashes whole expression
+
+<TerminalCell filename="trap-4.txt" runTag="❌">
+{`Scenario: HTTP Request returns 'user' sometimes, sometimes not
+
+Wrong:
+  ={{ $json.user.profile.email.toLowerCase() }}
+  → when user is null: TypeError: Cannot read properties of null
+  → entire workflow halts at this node
+
+Right (optional chain + nullish coalesce):
+  ={{ $json.user?.profile?.email?.toLowerCase() ?? '(no email)' }}
+
+Cheat sheet:
+  - Field may not exist?     → use ?.
+  - Want default if null?    → use ?? "default"
+  - Want default for any falsy (null/0/"") → use || "default"
+
+  ?? is stricter than ||: ?? only for null/undefined; || for all falsy.
+
+Mantra: "TypeError: Cannot read properties of undefined" = time for ?.`}
+</TerminalCell>
+
+## Trap 5 · Schedule timezone mismatch
+
+<TerminalCell filename="trap-5.txt" runTag="❌">
+{`Scenario: Cloud deploy, want "daily 9am Asia/Shanghai"
+
+Wrong attempt:
+  Schedule → Cron: 0 9 * * *
+  Expected: runs at 09:00 Shanghai
+  Actual:   runs at 17:00 Shanghai (was 09:00 UTC)
+
+Cause: Cloud defaults to UTC; "0 9 * * *" = UTC 9:00 = Shanghai 17:00.
+
+Fix A: use UTC time in cron
+  0 1 * * *      ← UTC 01:00 = Shanghai 09:00
+
+Fix B (self-host): change env
+  GENERIC_TIMEZONE=Asia/Shanghai
+  then "0 9 * * *" means Shanghai 09:00
+
+Fix C: use Interval + condition
+  Schedule (every hour) → IF (now.hour === 9 in Shanghai TZ?) → continue
+
+Diagnose:
+  - Add a Set with value = {{ $now.toISO() }} + {{ $now.zoneName }}
+  - Run once, compare to expectation
+
+Mantra: "Wrong time? Print $now.zoneName first."`}
+</TerminalCell>
+
+## Bonus: three lesser but common pits
+
+### Pit 6 · `$json` doesn't work in Code node
+
+Code node uses `items[0].json.x` instead. `$json` is **expressions only**.
+
+### Pit 7 · Non-ASCII field names need bracket notation
+
+```js
+$json["客户姓名"]         ✅
+$json["customer name"]   ✅
+```
+
+### Pit 8 · No for/if inside `{{ }}`
+
+`{{ }}` only allows expressions. For control flow:
+- Simple: ternary `?:`
+- Complex: Code node
+
+<TipCallout type="tip" title="Universal debug recipe">
+  1. Use the expression editor — watch the red error + live Result
+  2. Decompose: build up piece by piece (`={{ $json.user }}`, then `.profile`, etc.)
+  3. Add a temporary Set node to inspect intermediate state
+  4. Check the **actual** Execution data — never trust your imagination of what came in
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Deliberately reproduce all five traps in your own n8n. See what each error message looks like and where it appears. Next time you hit one in the wild, you'll diagnose in seconds.
+</TipCallout>
+
+## Section recap (and Part 3 recap)
+
+| Trap | Antidote |
+|---|---|
+| Expression not evaluating | Click `fx` |
+| `.item` "Couldn't find" | Switch to `.first()` or `.itemMatching($itemIndex)` |
+| Number becomes string | `Number(x)` or `+x` |
+| Nested undefined crashes | `?.` + `??` |
+| Timezone wrong | `GENERIC_TIMEZONE` or UTC cron |
+
+End of **Part 3**. Next is [Part 4 · Flow Logic](../../04-flow-logic/overview/) — branching, looping, error handling.

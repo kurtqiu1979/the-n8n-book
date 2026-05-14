@@ -1,0 +1,187 @@
+---
+title: 新手 5 大表达式坑 · 提前免疫
+description: 看完这 5 个真实翻车案例 + 解药，能避开 80% 的表达式问题
+sidebar:
+  order: 6
+  label: 3.5 新手 5 坑
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 3 章 · 第 5 节</span>
+
+n8n 论坛上 80% 的表达式问题，归根结底是同 5 个坑反复出现。本节直接亮答案——**看完这 5 个，你就比 90% 的新手少踩坑**。
+
+## 坑 1 · 忘记切表达式模式（最高频）
+
+<TerminalCell filename="trap-1.txt" runTag="❌">
+{`场景：HTTP Request 节点，URL 想动态用 $json.id
+
+输入：  https://api.com/users/{{ $json.id }}
+
+期望：  https://api.com/users/123
+实际：  https://api.com/users/{{ $json.id }}  ← 字面量！
+返回：  404 Not Found
+
+原因：  输入框处于固定值模式，没点 fx 切换。
+
+解药：
+  1. 鼠标悬停 URL 输入框 → 点右上角 fx 按钮
+  2. 输入框背景变粉、左上角出现 "Expression" 字样 → 现在是表达式模式
+  3. 重新填 {{ $json.id }} → 会被求值
+
+诊断口诀：  "表达式没生效？先看背景色"`}
+</TerminalCell>
+
+## 坑 2 · `.item` 引用错（出现 Merge / SplitInBatches 时）
+
+<TerminalCell filename="trap-2.txt" runTag="❌">
+{`场景：
+  [Get Users (5 items)] → [SplitInBatches (size=2)] → [Send Email]
+
+  Send Email 节点 To 字段:  ={{ $('Get Users').item.json.email }}
+
+报错：  "Couldn't find which item to use for this expression"
+
+原因：
+  SplitInBatches 重组了数据流，n8n 无法确定 "Send Email 的当前迭代"
+  和 "Get Users 的某个 item" 之间的配对关系。
+
+解药 A（推荐）：用 .first()
+  ={{ $('Get Users').first().json.email }}   ← 永远拿第一项，不出错
+
+解药 B：用 $json（紧邻上游已是 SplitInBatches 输出）
+  ={{ $json.email }}
+
+解药 C：用 .itemMatching($itemIndex) 按下标
+  ={{ $('Get Users').itemMatching($itemIndex).json.email }}
+
+诊断口诀：  ".item 是智能的，但智能并不总对"`}
+</TerminalCell>
+
+## 坑 3 · 数字字段意外变字符串
+
+<TerminalCell filename="trap-3.txt" runTag="❌">
+{`场景：Google Sheets 节点读出来 price 字段，下游想求总额
+
+输入数据（实际！）：
+  [
+    { product: "A", price: "9.99" },     ← 注意是字符串
+    { product: "B", price: "19.99" }
+  ]
+
+错误尝试：
+  ={{ $json.price + 0.01 }}             →  "9.990.01"   ❌
+
+正确：
+  ={{ Number($json.price) + 0.01 }}     →  10           ✅
+  ={{ parseFloat($json.price) + 0.01 }} →  10           ✅
+  ={{ +$json.price + 0.01 }}            →  10           ✅ (前缀 + 简写)
+
+来源类型常识：
+  Sheets 单元格        → string
+  Webhook query 参数   → string  
+  Webhook JSON body    → 保留 JSON 类型（number 还是 number）
+  Postgres / MySQL     → 保留类型
+  HTTP API response    → 看响应 JSON
+
+诊断口诀：  "+ 出来是字符串拼接？前面没 Number()"`}
+</TerminalCell>
+
+## 坑 4 · 嵌套字段不存在导致整个表达式爆
+
+<TerminalCell filename="trap-4.txt" runTag="❌">
+{`场景：HTTP Request 返回 user 字段有时存在有时不存在
+
+错误：
+  ={{ $json.user.profile.email.toLowerCase() }}
+  → 当 user 为 null 时：
+     TypeError: Cannot read properties of null (reading 'profile')
+  → 整个 workflow 在这个节点挂掉
+
+正确（用可选链 ?. + 默认值 ??）：
+  ={{ $json.user?.profile?.email?.toLowerCase() ?? '(无邮箱)' }}
+
+完整心法：
+  - 不确定上游有没有的字段 → ?.
+  - 想给空值一个默认 → ?? "默认"
+  - 想给 null/0/"" 等所有"假值"默认 → || "默认"
+
+  ?? 比 || 严格：?? 只在 null/undefined 时兜底；|| 在所有假值时兜底。
+
+诊断口诀：  "TypeError: Cannot read properties of undefined" = 该用 ?. 了`}
+</TerminalCell>
+
+## 坑 5 · Schedule 触发器时区跟 cron 表达式时区不一致
+
+<TerminalCell filename="trap-5.txt" runTag="❌">
+{`场景：你在 Cloud 部署，想让 workflow "每天北京时间 9:00 跑"
+
+错误尝试：
+  Schedule 节点 → Cron Expression: 0 9 * * *
+  期望：每天 09:00 跑
+  实际：每天 17:00 跑（北京时间）
+
+原因：
+  Cloud 默认 UTC，cron "0 9 * * *" = UTC 9:00 = 北京 17:00
+
+解药 A：改 cron 用 UTC 时间
+  0 1 * * *      ← UTC 1:00 = 北京 9:00
+
+解药 B（自托管）：改环境变量
+  GENERIC_TIMEZONE=Asia/Shanghai
+  然后 0 9 * * * 就是北京 9:00 了
+
+解药 C：用 Interval 模式 + 自己加判断
+  Schedule (每小时) → IF (now.hour === 9 in shanghai TZ?) → 继续
+
+诊断方法：
+  - 在节点里加一个 Set，值 = {{ $now.toISO() }} + {{ $now.zoneName }}
+  - 跑一次看真实时区是不是预期
+
+诊断口诀：  "时间不对？先打印 $now.zoneName"`}
+</TerminalCell>
+
+## 加场：3 个次要但常见的坑
+
+### 坑 6 · `$json` 在 Code 节点里不能直接用
+
+Code 节点用 `items[0].json.x` 取数据，**不能**用 `$json`。`$json` 只在表达式里有效。
+
+### 坑 7 · 中文字段名要用括号取
+
+```js
+$json["客户姓名"]       ✅
+$json.客户姓名         ✅（也可，但有特殊字符就不行）
+$json["customer name"] ✅
+```
+
+### 坑 8 · 表达式里 `for/if` 写不出来
+
+`{{ }}` 里只允许写**表达式**，不能写语句。要循环或条件分支：
+- 简单：用三元 `?:`
+- 复杂：换 Code 节点
+
+<TipCallout type="tip" title="如何快速排查任意表达式问题">
+  1. 在表达式编辑器右侧看**红色错误信息** + Result 实时预览
+  2. 拆分：把表达式拆成小段独立验证（如先 `={{ $json.user }}`，再加 `.profile`，逐步加深）
+  3. 加 Set 节点临时输出中间变量
+  4. 看 Execution 历史里**真实的**输入数据（不要靠想象）
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  打开 n8n，把上面的 5 个坑都**手动复现**一遍：故意写错代码，看错误信息长什么样、什么颜色、出现在哪里。下次遇到能秒认。
+</TipCallout>
+
+## 本节要点回顾（也是整个第 3 部分回顾）
+
+| 坑 | 解药 |
+|---|---|
+| 表达式没生效 | 点 `fx` 切表达式模式 |
+| `.item` 报 Couldn't find | 改用 `.first()` 或 `.itemMatching($itemIndex)` |
+| 数字字段变字符串 | `Number(x)` 或 `+x` 显式转 |
+| 嵌套字段 undefined 报错 | 用 `?.` 安全链 + `??` 默认值 |
+| Schedule 时区不对 | 改 `GENERIC_TIMEZONE` 或 cron 用 UTC |
+
+至此你已学完 **第 3 部分**。下一部分是真正进入"工业级 workflow" 的[流程控制 (Flow Logic)](../../04-flow-logic/overview/)。

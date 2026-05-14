@@ -1,0 +1,182 @@
+---
+title: 引用上下游数据 · $json / $() / .first() / .all()
+description: 在表达式里精准取到你要的数据 —— 6 种最常用引用方式速查
+sidebar:
+  order: 3
+  label: 3.2 数据引用
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 3 章 · 第 2 节</span>
+
+写表达式 80% 的时间花在"**从哪个节点取数据**"上。这一节把所有引用语法集中讲清楚——以后查任何上游数据都不再卡壳。
+
+## 速查表（先记这张图）
+
+<TerminalCell filename="ref-cheatsheet.txt" runTag="📑">
+{`引用"上一个节点"的当前 Item：
+  $json                       → 当前 item 的 JSON
+  $json.fieldName             → 当前 item 的 fieldName
+  $binary                     → 当前 item 的二进制（文件附件）
+
+引用"任意其他节点"：
+  $('NodeName').item          → 当前迭代对应的那个 item（智能配对）
+  $('NodeName').first()       → 第一个 item
+  $('NodeName').last()        → 最后一个 item
+  $('NodeName').all()         → 全部 items 数组
+  $('NodeName').itemMatching(idx)  → 按 index 取
+
+每个 item 引用后接 .json / .binary：
+  $('Sheets').first().json.email
+  $('Sheets').all()[0].json.email
+  $('Sheets').itemMatching(2).json.email`}
+</TerminalCell>
+
+## `$json` —— 最常用，但有边界
+
+`$json` 永远指代**当前节点正在处理的那个 Item**。
+
+<TerminalCell filename="json-scope.txt" runTag="🎯">
+{`场景：HTTP Request 节点拿到 3 个用户的数组，
+       下游 Set 节点对每个 user 处理（迭代 3 次）
+
+迭代第 1 次：  $json = { name: "Alice", id: 1 }
+迭代第 2 次：  $json = { name: "Bob",   id: 2 }
+迭代第 3 次：  $json = { name: "Carol", id: 3 }
+
+所以 Set 里写：
+  ={{ $json.name }} 的 ID 是 {{ $json.id }}
+
+会输出 3 条：
+  Alice 的 ID 是 1
+  Bob 的 ID 是 2
+  Carol 的 ID 是 3`}
+</TerminalCell>
+
+**`$json` 只引用紧邻的上游节点**。再往前的节点必须用 `$('NodeName')`。
+
+## `$('NodeName')` —— 跨节点引用
+
+把节点名（在画布上看到的那个名字）填进去，能拿到该节点的输出。**节点名带空格、特殊符号都可以**——加引号即可。
+
+<TerminalCell filename="cross-node.txt" runTag="🔗">
+{`workflow:
+  [Get Users] → [Filter Active] → [Send Email]
+
+在 Send Email 节点里：
+  $json                            ← Filter Active 节点的当前 item
+  $('Get Users').first()           ← Get Users 的第一个 item
+  $('Get Users').all().length      ← Get Users 总共有几个 item
+  $('Get Users').first().json.id   ← Get Users 第一个 item 的 id 字段`}
+</TerminalCell>
+
+## `.first()` / `.last()` / `.all()` —— 简单可靠
+
+这三个 method 永远返回**确定值**——不依赖"迭代配对"，最稳。
+
+<TerminalCell filename="first-last-all.txt" runTag="✅">
+{`.first()  → 数组的第 0 项
+.last()   → 数组的最后一项
+.all()    → 整个数组（用于聚合、求和、计数）
+
+例：
+  $('Sheets').first().json.email        ← 第一行的 email
+  $('Sheets').last().json.created_at    ← 最新一条记录的时间
+  $('Sheets').all().length              ← 一共有多少条
+  $('Sheets').all().map(i => i.json.email).join(', ')   ← 拼所有 email`}
+</TerminalCell>
+
+**新手优先用这三个**。下面的 `.item` 是高级用法但容易翻车。
+
+## `.item` —— 智能配对（高级，慎用）
+
+`$('NodeName').item` 是个**特殊变量**——它试图返回"和当前迭代配对的那个 item"。
+
+<TerminalCell filename="item-magic.txt" runTag="🪄">
+{`场景：HTTP Request 输出 3 个用户，
+       Slack 节点对每个用户发一条消息（迭代 3 次）
+
+在 Slack 节点里写：
+  ={{ $('HTTP Request').item.json.name }}
+
+迭代第 1 次：  $('HTTP Request').item = { name: "Alice" }    ← 自动配对到 Alice
+迭代第 2 次：  $('HTTP Request').item = { name: "Bob" }      ← 自动配对到 Bob
+
+✅ 它在 work，因为 HTTP Request 的 3 个 item 和 Slack 的 3 个迭代是 1:1 配对的`}
+</TerminalCell>
+
+**翻车场景**：当迭代关系**不是 1:1** 时，`.item` 会报错或返回错误数据：
+
+<TerminalCell filename="item-fails.txt" runTag="❌">
+{`场景：上游有 3 个 item，但中间有 Merge / SplitInBatches 节点把数据重新组合了
+
+此时 n8n 无法确定 "当前迭代" 对应上游的哪个 item，.item 会：
+  - 报错 "Couldn't find which item to use for this expression"
+  - 或默默地用第一项（更危险）
+
+✅ 解决方案：
+  - 如果你能确定要"第一项"：用 .first()
+  - 如果你需要按 index 配对：用 .itemMatching($itemIndex)
+  - 如果想保留智能配对：保证 1:1 关系（用 SplitInBatches 反而会破坏）`}
+</TerminalCell>
+
+<TipCallout type="warn" title="新手建议 · 永远先试 .first()">
+  遇到引用问题，先用 `.first()` 看看能不能跑通。如果 `.first()` 不对（你确实需要逐项配对），再考虑 `.item` 或 `.itemMatching($itemIndex)`。新手 80% 的"为什么引用错"问题都是 `.item` 在偷偷翻车。
+</TipCallout>
+
+## `.itemMatching(idx)` —— 按下标精确取
+
+显式按下标取，最不会翻车：
+
+<TerminalCell filename="item-matching.txt" runTag="🎯">
+{`$('Sheets').itemMatching(0)              ← 等价于 .first()
+$('Sheets').itemMatching($itemIndex)     ← 按当前迭代的 index 取（手动版 .item）
+$('Sheets').itemMatching(5)              ← 第 6 项（如果存在）`}
+</TerminalCell>
+
+## 引用 binary 数据
+
+附件、图片这类二进制数据：
+
+<TerminalCell filename="binary-ref.txt" runTag="📎">
+{`$binary                              ← 当前 item 的 binary 字段（所有附件）
+$binary.image                        ← 名为 image 的附件
+$binary.image.data                   ← 该附件的 base64 内容
+$binary.image.mimeType               ← 文件 mime 类型
+
+$('Read File').first().binary.data   ← 跨节点引用附件`}
+</TerminalCell>
+
+## 一图总结决策树
+
+<TerminalCell filename="decision-tree.txt" runTag="🌳">
+{`Q1: 引用的节点是不是"紧邻上一个"？
+    ├─ 是 → 用 $json
+    └─ 否 → 进 Q2
+
+Q2: 上游节点输出几个 item？
+    ├─ 只有 1 个 → 用 $('Name').first().json.x
+    ├─ 多个，要全部 → 用 $('Name').all()
+    ├─ 多个，要最新一个 → 用 $('Name').last()
+    └─ 多个，要"配对当前迭代" → 进 Q3
+
+Q3: 数据流是不是严格 1:1（没有 Merge/SplitInBatches）？
+    ├─ 是 → 用 $('Name').item.json.x
+    └─ 否 → 用 $('Name').itemMatching($itemIndex).json.x`}
+</TerminalCell>
+
+<TipCallout type="quest" title="扩展挑战">
+  搭个 3 节点 workflow：Manual Trigger → Set（输出 5 个 item，每个 item 含 name 和 age） → 第二个 Set。在第二个 Set 里同时用 `$json.name`、`$('Set').first().json.name`、`$('Set').last().json.name` 取值，观察各自得到什么。
+</TipCallout>
+
+## 本节要点回顾
+
+- `$json` 引用紧邻上游的当前 item
+- `$('NodeName')` + `.first/.last/.all` 是最稳的跨节点引用方式
+- `.item` 是智能配对但容易翻车，新手先用 `.first()` 兜底
+- `.itemMatching($itemIndex)` 是显式按下标取，最稳的"配对"方式
+- 二进制数据用 `$binary` 或 `$('Name').first().binary`
+
+下一节[JavaScript 速查](../js-cheatsheet/)，把表达式里的常用 JS 函数过一遍。

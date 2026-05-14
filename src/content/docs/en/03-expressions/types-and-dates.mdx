@@ -1,0 +1,203 @@
+---
+title: Types & Dates · The Devil in the Details
+description: String to number, boolean truthiness, timezones, formatting — the most common expression traps
+sidebar:
+  order: 5
+  label: 3.4 Types & Dates
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 3 · Section 4</span>
+
+When expressions "don't return what you expect," 60% of the time it's a type issue. This section covers JS's type quirks, n8n's coercion habits, and the date/timezone traps.
+
+## JS type quirks (refresher)
+
+<TerminalCell filename="js-quirks.txt" runTag="⚠">
+{`// String + number
+"3" + 2           →  "32"          (concatenation!)
+"3" - 2           →  1             (minus forces numeric)
+"3" * 2           →  6
+
+// Truthiness
+Boolean(0)        →  false
+Boolean("")       →  false
+Boolean("0")      →  true          (non-empty string!)
+Boolean("false")  →  true          (string "false" is truthy!)
+Boolean(null)     →  false
+Boolean([])       →  true
+Boolean({})       →  true
+
+// Equality
+"3" == 3          →  true          (== coerces; AVOID)
+"3" === 3         →  false         (=== strict; preferred)
+null == undefined →  true
+null === undefined→  false`}
+</TerminalCell>
+
+**Use `===` always.**
+
+## n8n field type origins
+
+<TerminalCell filename="common-types.txt" runTag="🔤">
+{`Source                Field                Type
+─────                ────                 ────
+Google Sheets        cell                 string (even numbers!)
+Webhook query        ?id=123              string
+Webhook JSON body    { "id": 123 }        number
+Database (SQL)       numeric column       number
+Database (SQL)       date column          ISO string
+Manual Trigger       (none)               $json = {}
+
+Lesson: numbers from Sheets / query strings must be cast.`}
+</TerminalCell>
+
+## Safe conversions
+
+<TerminalCell filename="type-cast.txt" runTag="🔁">
+{`// String → number
+Number("123")                    →  123
+Number("123abc")                 →  NaN          (not 0!)
+parseInt("123abc")               →  123
+parseFloat("12.5kg")             →  12.5
+
+// Guard against NaN
+Number("abc") || 0               →  0
+isNaN(Number("abc"))             →  true
+
+// Number → string
+String(123)                      →  "123"
+\`\${123}\`                         →  "123"
+
+// To boolean
+!!"hello"                        →  true
+!!""                             →  false
+
+// String "true"/"false" → boolean
+JSON.parse("true")               →  true
+JSON.parse("false")              →  false`}
+</TerminalCell>
+
+## Dates: Luxon (NOT native Date)
+
+n8n injects [Luxon](https://moment.github.io/luxon/). Don't use `new Date()` unless you enjoy timezone bugs.
+
+### Current time
+
+<TerminalCell filename="luxon-now.txt" runTag="📅">
+{`$now                             →  Luxon DateTime (n8n instance TZ)
+$today                           →  today at 00:00
+$now.toISO()                     →  "2026-05-13T10:23:45.123+08:00"
+$now.toUTC()                     →  to UTC
+$now.toMillis()                  →  Unix ms
+$now.toSeconds()                 →  Unix seconds`}
+</TerminalCell>
+
+### Parse strings
+
+<TerminalCell filename="luxon-parse.txt" runTag="📅">
+{`// ISO
+DateTime.fromISO("2026-05-13T10:23:45Z")
+
+// Custom format
+DateTime.fromFormat("13/05/2026", "dd/MM/yyyy")
+
+// Unix
+DateTime.fromMillis(1715000000000)
+DateTime.fromSeconds(1715000000)
+
+// Validate
+const dt = DateTime.fromISO("invalid")
+dt.isValid                       →  false
+dt.invalidReason                 →  "unparsable"`}
+</TerminalCell>
+
+### Math
+
+<TerminalCell filename="luxon-math.txt" runTag="📅">
+{`$now.plus({ days: 7 })           →  7 days later
+$now.plus({ hours: 3, minutes: 30 })
+$now.minus({ months: 1 })
+
+$now.startOf("day")              →  today 00:00
+$now.startOf("month")            →  1st of month
+$now.startOf("week")             →  Monday 00:00
+$now.endOf("day")                →  today 23:59:59.999
+
+// Diff
+$now.diff($now.minus({ days: 3 }), "days").days   →  3`}
+</TerminalCell>
+
+### Format
+
+<TerminalCell filename="luxon-format.txt" runTag="📅">
+{`$now.toFormat("yyyy-MM-dd")            →  "2026-05-13"
+$now.toFormat("HH:mm:ss")              →  "10:23:45"
+$now.toFormat("yyyy-MM-dd HH:mm")      →  "2026-05-13 10:23"
+$now.toFormat("EEEE")                  →  "Wednesday"
+
+$now.toISODate()                       →  "2026-05-13" (date only)
+$now.toISOTime()                       →  time only`}
+</TerminalCell>
+
+### Timezones
+
+<TerminalCell filename="luxon-tz.txt" runTag="🌍">
+{`$now.setZone("Asia/Shanghai")
+$now.setZone("America/New_York")
+$now.setZone("UTC")
+
+$now.zoneName                          →  "Asia/Shanghai"
+$now.offset                            →  480 minutes (UTC+8)`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Top timezone trap — n8n Cloud defaults to UTC">
+  If you write Schedule = "9:00", you'll get UTC 9:00 — not your local 9:00. Fix: either set `GENERIC_TIMEZONE` env (self-host) or convert to UTC in cron expression. Always print `$now.zoneName` first to confirm.
+</TipCallout>
+
+## Common traps
+
+### Trap 1 · Sheets number becomes string concat
+
+<TerminalCell filename="trap-sheets.txt" runTag="❌">
+{`From Sheets:  $json.count = "5"  (string!)
+
+Wrong:  ={{ $json.count + 1 }}              →  "51"   ❌
+Right:  ={{ Number($json.count) + 1 }}      →  6      ✅
+Right:  ={{ +$json.count + 1 }}             →  6      ✅`}
+</TerminalCell>
+
+### Trap 2 · Nested field undefined crashes expression
+
+<TerminalCell filename="trap-missing.txt" runTag="❌">
+{`Wrong:
+  ={{ $json.user.email.toLowerCase() }}
+  → when user/email missing: TypeError
+
+Right:
+  ={{ $json.user?.email?.toLowerCase() ?? '(no email)' }}
+  → optional chain + nullish coalesce`}
+</TerminalCell>
+
+### Trap 3 · Object equality compares references
+
+<TerminalCell filename="trap-object-eq.txt" runTag="❌">
+{`Wrong:  ={{ $json.tags == ['a', 'b'] }}     →  false (refs differ)
+Right:  ={{ JSON.stringify($json.tags) === JSON.stringify(['a','b']) }} ✅`}
+</TerminalCell>
+
+<TipCallout type="quest" title="Extension challenge">
+  Run in the editor: `$now.minus({ years: 1 }).toFormat('yyyy-MM-dd')`. Then `$now.setZone('America/New_York').minus({ years: 1 }).toISO()`. Compare the timezone shift.
+</TipCallout>
+
+## Section recap
+
+- Use `===`, not `==`
+- Explicit `Number()` when from Sheets / query strings
+- Safe nested access: `obj?.field ?? 'default'`
+- Use **Luxon** for dates; check `$now.zoneName`
+- Object equality: `JSON.stringify(a) === JSON.stringify(b)`
+
+Next: [the 5 traps every beginner hits](../beginner-traps/).

@@ -1,0 +1,189 @@
+---
+title: JavaScript Cheat Sheet · The 30 Functions You'll Reuse
+description: Strings, arrays, numbers, dates — one page, no more flipping to MDN
+sidebar:
+  order: 4
+  label: 3.3 JS Cheat Sheet
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 3 · Section 3</span>
+
+Expressions are just JavaScript. But 80% of usage hits the same 30 functions. This page is your **expression bookmark**.
+
+## Strings
+
+<TerminalCell filename="string-ops.txt" runTag="🔤">
+{`// Case
+"hello".toUpperCase()                  →  "HELLO"
+"HELLO".toLowerCase()                  →  "hello"
+
+// Trim / replace
+"  hi  ".trim()                        →  "hi"
+"hello world".replace("world", "n8n")  →  "hello n8n"
+"a-b-c-d".replaceAll("-", "_")         →  "a_b_c_d"
+
+// Slice / contains
+"hello world".slice(0, 5)              →  "hello"
+"hello world".split(" ")               →  ["hello", "world"]
+"hello".includes("ell")                →  true
+"hello".startsWith("he")               →  true
+
+// Length / reverse
+"hello".length                         →  5
+"hello".split("").reverse().join("")   →  "olleh"
+
+// Template literal
+\`Hello \${name}, you are \${age}\`        →  "Hello Alice, you are 30"`}
+</TerminalCell>
+
+## Arrays
+
+<TerminalCell filename="array-ops.txt" runTag="🔢">
+{`// Length / access
+[1,2,3].length                              →  3
+[1,2,3][0]                                  →  1
+[1,2,3].at(-1)                              →  3
+
+// Filter / map / find
+[1,2,3,4].filter(x => x > 2)                →  [3,4]
+[1,2,3].map(x => x * 2)                     →  [2,4,6]
+[1,2,3,4].find(x => x > 2)                  →  3
+
+// Aggregate
+[1,2,3,4].reduce((a, b) => a + b, 0)        →  10
+[3,1,2].sort()                              →  [1,2,3]
+[{a:1},{a:2}].sort((x,y) => x.a - y.a)
+
+// Dedupe
+[...new Set([1,1,2,3,3])]                   →  [1,2,3]
+
+// Predicate
+[1,2,3].some(x => x > 2)                    →  true
+[1,2,3].every(x => x > 0)                   →  true
+
+// Join / concat
+[1,2,3].join(",")                           →  "1,2,3"
+[...[1,2], ...[3,4]]                        →  [1,2,3,4]`}
+</TerminalCell>
+
+## Numbers
+
+<TerminalCell filename="number-ops.txt" runTag="🔢">
+{`parseInt("123abc")           →  123
+parseFloat("12.5kg")         →  12.5
+Number("123.45")             →  123.45
+
+Math.round(1.6)              →  2
+Math.floor(1.9)              →  1
+Math.ceil(1.1)               →  2
+Math.abs(-5)                 →  5
+Math.max(1, 2, 3)            →  3
+Math.random()                →  0.xxx
+
+(3.14159).toFixed(2)         →  "3.14"
+
+Number.isInteger(5)          →  true
+isNaN("abc")                 →  true`}
+</TerminalCell>
+
+## Dates (use Luxon — DON'T use native Date)
+
+<TerminalCell filename="date-ops.txt" runTag="📅">
+{`// Now
+$now                                  →  Luxon DateTime
+$today                                →  today at 00:00
+$now.toISO()                          →  "2026-05-13T10:23:45.000+08:00"
+$now.toFormat("yyyy-MM-dd")           →  "2026-05-13"
+
+// Math
+$now.plus({ days: 7 })                →  7 days later
+$now.minus({ hours: 3 })              →  3 hours ago
+$now.startOf("month")                 →  1st of this month, 00:00
+$now.endOf("week")                    →  end of this week
+
+// Parse
+DateTime.fromISO("2026-05-13")
+DateTime.fromFormat("13/05/2026", "dd/MM/yyyy")
+DateTime.fromMillis(1715000000000)
+
+// Timezone
+$now.setZone("Asia/Shanghai")
+$now.zoneName                         →  current zone`}
+</TerminalCell>
+
+## Objects
+
+<TerminalCell filename="object-ops.txt" runTag="🗂">
+{`// Access
+obj.field        or       obj["field"]
+obj.a?.b?.c      (optional chain)
+
+// keys / values / entries
+Object.keys(obj)                  →  ["a", "b"]
+Object.values(obj)                →  [1, 2]
+Object.entries(obj)               →  [["a", 1], ["b", 2]]
+
+// Merge / clone
+{ ...obj1, ...obj2 }              →  shallow merge
+JSON.parse(JSON.stringify(obj))   →  deep clone
+
+// Defaults
+obj.field || "default"            →  if falsy
+obj.field ?? "default"            →  if null/undefined only`}
+</TerminalCell>
+
+## Ternary & short-circuit
+
+<TerminalCell filename="ternary.txt" runTag="❓">
+{`condition ? a : b                 →  one-line if/else
+condition && a                    →  a iff condition truthy
+condition || a                    →  a iff condition falsy
+
+// Real
+={{ $json.score > 60 ? 'pass' : 'fail' }}
+={{ $json.active && '✓' }}
+={{ $json.name || '(anonymous)' }}`}
+</TerminalCell>
+
+## Regex
+
+<TerminalCell filename="regex.txt" runTag="🔍">
+{`"hello123".match(/\\d+/)[0]          →  "123"
+"a.b.c".replace(/\\./g, "_")         →  "a_b_c"
+/\\d+/.test("hello123")              →  true
+
+// Common
+/^\\d+$/                            →  digits only
+/^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$/      →  basic email
+/^https?:\\/\\//                     →  starts with http(s)`}
+</TerminalCell>
+
+## JSON
+
+<TerminalCell filename="json-ops.txt" runTag="📦">
+{`JSON.stringify(obj)             →  obj to string
+JSON.stringify(obj, null, 2)    →  pretty (2-space indent)
+JSON.parse('{"a":1}')           →  string to obj`}
+</TerminalCell>
+
+<TipCallout type="tip" title="Regex backslash">
+  In `{{ }}` expressions, regex `\d` must be written `\\d` (one extra escape for the JS string). In the expression editor display it'll appear as `\d`.
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  Paste five examples from above into the n8n expression editor, real-run them. Seeing-vs-running cements memory ten times better.
+</TipCallout>
+
+## Section recap
+
+- Strings: `toUpperCase/trim/replace/slice/split/includes` + template literals
+- Arrays: `map/filter/find/reduce/some/every` + `[...new Set()]` dedupe
+- Dates: **Luxon** (`$now.plus({days})`, `.toFormat()`)
+- Objects: `Object.keys/values/entries` + `?.` chain
+- Ternary `? :` for simple conditions
+- Regex: double-backslash inside `{{ }}`
+
+Next: [Types & Dates deep dive](../types-and-dates/).
