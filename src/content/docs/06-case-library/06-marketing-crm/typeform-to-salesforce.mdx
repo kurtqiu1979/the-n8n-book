@@ -1,0 +1,75 @@
+---
+title: Typeform → Salesforce 自动打标
+description: Typeform 提交 → AI 根据答案打标 + 评分 + 估算 vertical → Salesforce 建 Lead → Slack 通知销售
+sidebar:
+  order: 3
+  label: 案例 6.3 · Typeform → Salesforce
+difficulty: medium
+theme: marketing-crm
+nodes:
+  - Typeform Trigger
+  - AI Agent
+  - Salesforce
+  - Slack
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/typeform-to-salesforce.json';
+
+<span class="editorial-label">第 6 部分 · 案例 6.3 · 📣 营销 CRM</span>
+
+> **难度** 🟡 中等 · **耗时** ~30 分钟 · **核心节点** Typeform × AI Tag × Salesforce
+
+Typeform 收集的潜客信息，销售拿到后还要手动判断"Hot/Warm/Cold"再决定跟进顺序。这个 workflow 让 AI 一进来就**自动评分 + 打标 + 估算行业**，Salesforce 收到的就已经是分级好的 Lead，团队直接按热度排队跟进。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="typeform-to-salesforce.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Typeform Trigger:
+  Form ID: <你的 Typeform>
+  → 每次新提交触发
+
+AI Auto-Tag:
+  Input:  ={{ JSON.stringify($json.answers) }}
+  System: 根据 Typeform 答案给 lead 打标 + 估算 vertical
+          输出 JSON: { tags, vertical, score(0-100) }
+
+Create SF Lead:
+  Email:    从 typeform 答案里挖
+  Company:  ...
+  Industry: ={{ $json.vertical }}
+  Rating:   ={{ score>70 ? 'Hot' : score>40 ? 'Warm' : 'Cold' }}
+
+Notify Sales (Slack):
+  Channel: #sales
+  Text:    含 Tags + Score 信息`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="typeform-to-salesforce.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · Typeform 答案结构很怪">
+  
+  Typeform 的 `answers` 是数组，每项有 `field.ref` 或 `field.type` 来识别哪个问题。要用 `.find()` 按 ref 找——不能按 index 取（用户可能跳过某题）。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 高分 Lead (>70) 自动分配给最近一周成交最多的销售
+  - 加 Vector Store：把历史成交 Lead 存起来，AI 检索"类似客户的转化率"作为评分参考
+  - 失败回退：Salesforce 写失败时自动落到 Airtable 备份
+  
+</TipCallout>

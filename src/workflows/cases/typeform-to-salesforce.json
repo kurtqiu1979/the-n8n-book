@@ -1,0 +1,71 @@
+{
+  "name": "Typeform to Salesforce",
+  "nodes": [
+    {
+      "parameters": { "formId": "<TYPEFORM_ID>" },
+      "id": "node-typeform",
+      "name": "Typeform Trigger",
+      "type": "n8n-nodes-base.typeformTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json.answers) }}",
+        "options": {
+          "systemMessage": "根据 Typeform 答案给 lead 自动打标 + 估算 vertical。返回 JSON：\n{ \"tags\": [\"enterprise\", \"high-intent\", ...], \"vertical\": \"saas|ecommerce|services|other\", \"score\": 0-100 }\n只回 JSON。"
+        }
+      },
+      "id": "node-ai-tag",
+      "name": "AI Auto-Tag",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [480, 300]
+    },
+    {
+      "parameters": { "model": "gpt-4o-mini", "options": { "responseFormat": "json_object" } },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [480, 500]
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "create",
+        "email": "={{ $('Typeform Trigger').item.json.answers.find(a => a.field.type === 'email').email }}",
+        "additionalFields": {
+          "firstName": "={{ $('Typeform Trigger').item.json.answers.find(a => a.field.ref === 'first_name').text }}",
+          "company": "={{ $('Typeform Trigger').item.json.answers.find(a => a.field.ref === 'company').text }}",
+          "leadSource": "Typeform",
+          "industry": "={{ $json.vertical }}",
+          "rating": "={{ $json.score > 70 ? 'Hot' : ($json.score > 40 ? 'Warm' : 'Cold') }}"
+        }
+      },
+      "id": "node-sf",
+      "name": "Create SF Lead",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#sales",
+        "text": "=🎯 New Typeform lead\\nCompany: {{ $('Typeform Trigger').item.json.answers.find(a => a.field.ref === 'company').text }}\\nTags: {{ $json.tags.join(', ') }}\\nScore: {{ $json.score }}/100"
+      },
+      "id": "node-slack",
+      "name": "Notify Sales",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [1020, 300]
+    }
+  ],
+  "connections": {
+    "Typeform Trigger": { "main": [[{ "node": "AI Auto-Tag", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "AI Auto-Tag", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Auto-Tag": { "main": [[{ "node": "Create SF Lead", "type": "main", "index": 0 }]] },
+    "Create SF Lead": { "main": [[{ "node": "Notify Sales", "type": "main", "index": 0 }]] }
+  }
+}

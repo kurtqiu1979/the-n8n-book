@@ -1,0 +1,80 @@
+---
+title: 邮件 Drip 营销
+description: 用户注册 → Day 0 欢迎 → 等 3 天 → 看活跃度 → 不活跃发挽留 → Day 7 高级技巧
+sidebar:
+  order: 2
+  label: 案例 6.2 · 邮件 Drip
+difficulty: medium
+theme: marketing-crm
+nodes:
+  - Webhook
+  - Email Send
+  - Wait
+  - HTTP Request
+  - IF
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/drip-campaign.json';
+
+<span class="editorial-label">第 6 部分 · 案例 6.2 · 📣 营销 CRM</span>
+
+> **难度** 🟡 中等 · **耗时** ~30 分钟 · **核心节点** Wait × IF × 长 workflow
+
+经典 SaaS 用户养成路径：Day 0 欢迎、Day 3 检查活跃度（不活跃发再激活邮件）、Day 7 给老司机技巧。这个 workflow 演示了 **Wait 节点跨多天保持执行状态**的关键能力。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="drip-campaign.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={360} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`User Signup (Webhook):
+  POST /signup
+  Body: { email, name, user_id }
+
+Day 0 Welcome:
+  立即发欢迎邮件
+
+Wait 3 Days:
+  Amount: 3, Unit: days
+  ← workflow execution 状态保留 3 天
+
+Check Usage:
+  GET https://api.example.com/usage?user={{ $json.body.user_id }}
+  返回 { actions_count }
+
+Inactive? (IF):
+  actions_count == 0 → True
+  True 路径:  Day 3 Re-engage
+  False 路径: 直接进 Wait 4 More Days
+
+Wait 4 More Days + Day 7 Power User:
+  无论 Day 3 是否发了挽留，Day 7 都发`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="drip-campaign.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · Wait 节点的极限">
+  
+  Wait 节点底层在数据库保存 execution 状态。如果你的 wait 时间很长（多天）且并发量大，**数据库会膨胀**。生产环境监控 `executions` 表大小，配 `EXECUTIONS_DATA_PRUNE`。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 用 AI 节点根据用户行为生成个性化邮件正文（不只是模板）
+  - 加退订处理：用户点退订链接后 workflow 跳过后续邮件
+  - 跑 A/B 测试：相同 step 但不同邮件，对比转化率
+  
+</TipCallout>

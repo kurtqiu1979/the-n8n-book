@@ -1,0 +1,76 @@
+---
+title: Lead Enrichment Pipeline
+description: Webhook receives lead → Clearbit enriches → AI scores → write to HubSpot
+sidebar:
+  order: 1
+  label: Case 6.1 · Lead Enrichment
+difficulty: medium
+theme: marketing-crm
+nodes:
+  - Webhook
+  - HTTP Request
+  - AI Agent
+  - HubSpot
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/lead-enrichment.json';
+
+<span class="editorial-label">Part 6 · Case 6.1 · 📣 Marketing & CRM</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~30 min · **Core nodes** Webhook × Clearbit × AI Score × HubSpot
+
+The marketing "Get a demo" form only collected an email. This backend workflow auto-enriches via Clearbit (company, role, size), then AI scores (0-100) with a one-line review → writes to HubSpot. **Every lead the sales team sees is already enriched.**
+
+## 🔍 Workflow
+
+<TerminalCell filename="lead-enrichment.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Lead Webhook (Webhook):
+  Path:        /new-lead
+  HTTP Method: POST
+  Body:        { email, ... }
+
+Enrich via Clearbit (HTTP):
+  URL: =https://person.clearbit.com/v2/people/find?email={{ $json.body.email }}
+  Auth: Header Auth (Clearbit API key)
+
+AI Lead Scoring:
+  System: Score 0-100 based on Clearbit data + one-line rationale.
+          Consider: company size, industry, role seniority.
+          Output JSON: { score, reason }
+  Response Format: json_object
+
+Create HubSpot Contact:
+  Email:    ={{ $('Lead Webhook').body.email }}
+  Company:  ={{ $('Clearbit').employment.name }}
+  LeadScore: ={{ $json.score }}`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="lead-enrichment.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Clearbit 404, continue anyway">
+  
+  Personal emails are often not in Clearbit; the HTTP node gets 404. **Continue On Fail must be on**, then a downstream IF checks `$json.error` — write to HubSpot regardless, just without enrichment.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - High-score leads (>70) → IF + immediate Slack/DingTalk ping to sales
+  - Dual enrichment: Clearbit + Apollo/LinkedIn for better hit rate
+  - SplitInBatches to rate-limit Clearbit calls
+  
+</TipCallout>

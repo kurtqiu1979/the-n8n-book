@@ -1,0 +1,76 @@
+---
+title: 线索富化管道
+description: Webhook 接 lead → Clearbit 富化 → AI 评分 → 写入 HubSpot
+sidebar:
+  order: 1
+  label: 案例 6.1 · 线索富化
+difficulty: medium
+theme: marketing-crm
+nodes:
+  - Webhook
+  - HTTP Request
+  - AI Agent
+  - HubSpot
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/lead-enrichment.json';
+
+<span class="editorial-label">第 6 部分 · 案例 6.1 · 📣 营销 CRM</span>
+
+> **难度** 🟡 中等 · **耗时** ~30 分钟 · **核心节点** Webhook × Clearbit × AI Score × HubSpot
+
+营销页面的 "Get a demo" 表单只问了邮箱。后端这个 workflow 自动用 Clearbit 把邮箱补成完整资料（公司、职位、规模），再让 AI 评分（0-100）+ 评价 → 写入 HubSpot。**销售看到的 lead 都是富化过的**。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="lead-enrichment.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Lead Webhook (Webhook):
+  Path:        /new-lead
+  HTTP Method: POST
+  Body:        { email, ... }
+
+Enrich via Clearbit (HTTP):
+  URL: =https://person.clearbit.com/v2/people/find?email={{ $json.body.email }}
+  Auth: Header Auth (Clearbit API key)
+
+AI Lead Scoring:
+  System: 根据 Clearbit 数据评分 0-100，给一句话评价。
+          考虑: 公司规模、行业、职位级别。
+          输出 JSON: { score, reason }
+  Response Format: json_object
+
+Create HubSpot Contact:
+  Email:    ={{ $('Lead Webhook').body.email }}
+  Company:  ={{ $('Clearbit').employment.name }}
+  LeadScore: ={{ $json.score }}`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="lead-enrichment.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · Clearbit 找不到也要继续">
+  
+  很多个人邮箱 Clearbit 查不到，HTTP 节点会返回 404。**Continue On Fail 必须开**，然后下游 IF 检查 `$json.error` 是否存在——找不到 lead 也要写入 HubSpot，只是不富化。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 高分 lead (>70) 自动加 IF + 钉钉 / Slack 立刻通知销售
+  - 加 Apollo / LinkedIn API 双富化提高命中率
+  - 加 SplitInBatches 限速避免 Clearbit 单分钟超额
+  
+</TipCallout>

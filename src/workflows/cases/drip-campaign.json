@@ -1,0 +1,107 @@
+{
+  "name": "Email Drip Campaign",
+  "nodes": [
+    {
+      "parameters": { "path": "signup", "httpMethod": "POST" },
+      "id": "node-webhook",
+      "name": "User Signup",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "fromEmail": "welcome@example.com",
+        "toEmail": "={{ $json.body.email }}",
+        "subject": "Welcome to Example!",
+        "html": "=<h2>Hi {{ $json.body.name }}!</h2><p>Glad you joined us. Here's how to get started...</p>"
+      },
+      "id": "node-email-0",
+      "name": "Day 0 Welcome",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [420, 400]
+    },
+    {
+      "parameters": { "amount": 3, "unit": "days" },
+      "id": "node-wait-3",
+      "name": "Wait 3 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [620, 400]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.example.com/usage?user={{ $('User Signup').item.json.body.user_id }}",
+        "options": {}
+      },
+      "id": "node-check",
+      "name": "Check Usage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [820, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            { "leftValue": "={{ $json.actions_count }}", "rightValue": 0, "operator": { "type": "number", "operation": "equals" } }
+          ]
+        }
+      },
+      "id": "node-if",
+      "name": "Inactive?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1020, 400]
+    },
+    {
+      "parameters": {
+        "fromEmail": "welcome@example.com",
+        "toEmail": "={{ $('User Signup').item.json.body.email }}",
+        "subject": "Day 3: Need a hand?",
+        "html": "=<p>Hi {{ $('User Signup').item.json.body.name }}, noticed you haven't started yet. Here are 3 quick wins...</p>"
+      },
+      "id": "node-email-3",
+      "name": "Day 3 Re-engage",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1240, 300]
+    },
+    {
+      "parameters": { "amount": 4, "unit": "days" },
+      "id": "node-wait-7",
+      "name": "Wait 4 More Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1240, 500]
+    },
+    {
+      "parameters": {
+        "fromEmail": "welcome@example.com",
+        "toEmail": "={{ $('User Signup').item.json.body.email }}",
+        "subject": "Day 7: Tips from power users",
+        "html": "<p>Here's how our top 10% of users get the most out of Example...</p>"
+      },
+      "id": "node-email-7",
+      "name": "Day 7 Power User",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1460, 500]
+    }
+  ],
+  "connections": {
+    "User Signup": { "main": [[{ "node": "Day 0 Welcome", "type": "main", "index": 0 }]] },
+    "Day 0 Welcome": { "main": [[{ "node": "Wait 3 Days", "type": "main", "index": 0 }]] },
+    "Wait 3 Days": { "main": [[{ "node": "Check Usage", "type": "main", "index": 0 }]] },
+    "Check Usage": { "main": [[{ "node": "Inactive?", "type": "main", "index": 0 }]] },
+    "Inactive?": {
+      "main": [
+        [{ "node": "Day 3 Re-engage", "type": "main", "index": 0 }],
+        [{ "node": "Wait 4 More Days", "type": "main", "index": 0 }]
+      ]
+    },
+    "Day 3 Re-engage": { "main": [[{ "node": "Wait 4 More Days", "type": "main", "index": 0 }]] },
+    "Wait 4 More Days": { "main": [[{ "node": "Day 7 Power User", "type": "main", "index": 0 }]] }
+  }
+}

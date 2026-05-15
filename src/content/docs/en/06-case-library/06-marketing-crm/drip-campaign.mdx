@@ -1,0 +1,80 @@
+---
+title: Email Drip Campaign
+description: Signup → Day 0 welcome → Wait 3 days → check activity → re-engage if inactive → Day 7 power tips
+sidebar:
+  order: 2
+  label: Case 6.2 · Email Drip
+difficulty: medium
+theme: marketing-crm
+nodes:
+  - Webhook
+  - Email Send
+  - Wait
+  - HTTP Request
+  - IF
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/drip-campaign.json';
+
+<span class="editorial-label">Part 6 · Case 6.2 · 📣 Marketing & CRM</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~30 min · **Core nodes** Wait × IF × long workflow
+
+The classic SaaS onboarding journey: Day 0 welcome, Day 3 check activity (re-engage inactive users), Day 7 give power-user tips. This workflow demos **Wait nodes preserving execution state across multiple days**.
+
+## 🔍 Workflow
+
+<TerminalCell filename="drip-campaign.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={360} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`User Signup (Webhook):
+  POST /signup
+  Body: { email, name, user_id }
+
+Day 0 Welcome:
+  Send immediately
+
+Wait 3 Days:
+  Amount: 3, Unit: days
+  ← workflow execution state persists 3 days
+
+Check Usage:
+  GET https://api.example.com/usage?user={{ $json.body.user_id }}
+  Returns { actions_count }
+
+Inactive? (IF):
+  actions_count == 0 → True
+  True branch:  Day 3 Re-engage email
+  False branch: jump straight to Wait 4 More Days
+
+Wait 4 More Days + Day 7 Power User:
+  Day 7 always fires regardless of Day 3 branch`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="drip-campaign.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Wait node has limits">
+  
+  Wait persists execution state in the DB. Long waits (days) + high concurrency → **DB grows fast**. In production, monitor the `executions` table size and configure `EXECUTIONS_DATA_PRUNE`.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - AI-generate personalized email body based on user behavior (not just template)
+  - Unsubscribe handling: skip subsequent emails if user opted out
+  - A/B test: same step, two email variants, compare conversion
+  
+</TipCallout>

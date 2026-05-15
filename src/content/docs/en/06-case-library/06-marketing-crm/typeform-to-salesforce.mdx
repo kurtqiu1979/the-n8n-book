@@ -1,0 +1,75 @@
+---
+title: Typeform → Salesforce Auto-Tag
+description: Typeform submit → AI tags + scores + estimates vertical → create SF Lead → notify Slack
+sidebar:
+  order: 3
+  label: Case 6.3 · Typeform → SF
+difficulty: medium
+theme: marketing-crm
+nodes:
+  - Typeform Trigger
+  - AI Agent
+  - Salesforce
+  - Slack
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/typeform-to-salesforce.json';
+
+<span class="editorial-label">Part 6 · Case 6.3 · 📣 Marketing & CRM</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~30 min · **Core nodes** Typeform × AI Tag × Salesforce
+
+Leads collected via Typeform usually require sales to manually decide "Hot/Warm/Cold" before queuing follow-up. This workflow lets AI auto-tag, score, and estimate vertical the moment a lead lands. Salesforce receives pre-classified leads — sales queues by hotness.
+
+## 🔍 Workflow
+
+<TerminalCell filename="typeform-to-salesforce.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Typeform Trigger:
+  Form ID: <your Typeform>
+  → fires per submission
+
+AI Auto-Tag:
+  Input:  ={{ JSON.stringify($json.answers) }}
+  System: Tag + estimate vertical from Typeform answers.
+          Output JSON: { tags, vertical, score(0-100) }
+
+Create SF Lead:
+  Email:    extract from typeform answers
+  Company:  ...
+  Industry: ={{ $json.vertical }}
+  Rating:   ={{ score>70 ? 'Hot' : score>40 ? 'Warm' : 'Cold' }}
+
+Notify Sales (Slack):
+  Channel: #sales
+  Text:    includes Tags + Score`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="typeform-to-salesforce.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Typeform's answer structure is awkward">
+  
+  Typeform's `answers` is an array; each has `field.ref` or `field.type` for identification. Use `.find()` by ref — never index (users may skip questions).
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - High-score (>70) leads auto-assign to the sales rep with most recent-week deals
+  - Add Vector Store: index past closed-won leads, AI looks up "similar customer's conversion rate" as a scoring input
+  - Fallback: SF write fails → backup to Airtable
+  
+</TipCallout>
