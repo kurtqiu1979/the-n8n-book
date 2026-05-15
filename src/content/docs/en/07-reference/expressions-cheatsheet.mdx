@@ -1,0 +1,182 @@
+---
+title: Expression Cheat Sheet
+description: n8n expression syntax + common JS + Luxon dates · copy-paste blocks
+sidebar:
+  order: 3
+  label: 7.2 Expression Cheat Sheet
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Part 7 · Expression Cheat Sheet</span>
+
+The highest-frequency lookup while building workflows. This page covers 80% of expressions.
+
+## n8n built-ins
+
+<TerminalCell filename="builtins.txt" runTag="📋">
+{`$json                    current item's JSON
+$json.fieldName          its field
+$binary                  current item's binary (attachments)
+
+$('NodeName').first()    first item of node
+$('NodeName').last()     last item
+$('NodeName').all()      all items array
+$('NodeName').item       smart pairing (careful — see §3.5)
+$('NodeName').itemMatching(idx)  by index
+
+$now                     current Luxon DateTime
+$today                   today at 00:00
+$workflow                workflow meta ({ id, name, active })
+$execution               execution meta ({ id, mode })
+$env                     environment vars (self-host)
+$input                   node inputs
+$itemIndex               current item index in array
+
+$jmespath($json, 'a.b[*].c')   JMESPath query
+$randomString(8)               random string`}
+</TerminalCell>
+
+## Strings
+
+<TerminalCell filename="strings.txt" runTag="📋">
+{`{{ "hello".toUpperCase() }}                    → HELLO
+{{ "hello".length }}                           → 5
+{{ "  hi  ".trim() }}                          → "hi"
+{{ "a-b-c".replaceAll("-", "_") }}             → "a_b_c"
+{{ "hello world".split(" ") }}                 → ["hello", "world"]
+{{ "hello".slice(1, 4) }}                      → "ell"
+{{ "hello".includes("ell") }}                  → true
+{{ "hello".startsWith("he") }}                 → true
+
+Templates:
+={{ "Hi " + $json.name + ", you are " + $json.age }}
+={{ \`Hi \${$json.name}\` }}     ← backtick template literal`}
+</TerminalCell>
+
+## Arrays
+
+<TerminalCell filename="arrays.txt" runTag="📋">
+{`{{ [1,2,3].length }}                           → 3
+{{ [1,2,3].map(x => x * 2) }}                  → [2,4,6]
+{{ [1,2,3,4].filter(x => x > 2) }}             → [3,4]
+{{ [1,2,3,4].find(x => x > 2) }}               → 3
+{{ [1,2,3,4].reduce((a,b) => a+b, 0) }}        → 10
+{{ [3,1,2].sort() }}                           → [1,2,3]
+{{ [{a:1},{a:2}].sort((x,y) => x.a - y.a) }}
+{{ [1,2,3].some(x => x > 2) }}                 → true
+{{ [1,2,3].every(x => x > 0) }}                → true
+{{ [1,2,3].includes(2) }}                      → true
+{{ [...new Set([1,1,2,3,3])] }}                → [1,2,3]   dedup
+{{ [1,2,3].join(",") }}                        → "1,2,3"
+{{ [1,2,3].at(-1) }}                           → 3   last`}
+</TerminalCell>
+
+## Numbers
+
+<TerminalCell filename="numbers.txt" runTag="📋">
+{`{{ Number("123") }}                            → 123
+{{ +"123" }}                                   → 123   shorthand
+{{ parseInt("123abc") }}                       → 123
+{{ parseFloat("12.5kg") }}                     → 12.5
+{{ Math.round(1.6) }}                          → 2
+{{ Math.floor(1.9) }}                          → 1
+{{ Math.ceil(1.1) }}                           → 2
+{{ Math.abs(-5) }}                             → 5
+{{ Math.max(1, 2, 3) }}                        → 3
+{{ Math.min(1, 2, 3) }}                        → 1
+{{ Math.random() }}                            → 0.xxx
+{{ (3.14159).toFixed(2) }}                     → "3.14"`}
+</TerminalCell>
+
+## Dates (Luxon)
+
+<TerminalCell filename="dates.txt" runTag="📋">
+{`Now:
+{{ $now }}                                    Luxon DateTime
+{{ $now.toISO() }}                            "2026-05-15T10:23:45+08:00"
+{{ $now.toISODate() }}                        "2026-05-15"
+{{ $now.toMillis() }}                         1715000000000
+{{ $now.toFormat("yyyy-MM-dd") }}             "2026-05-15"
+{{ $now.toFormat("MMMM d, yyyy") }}           "May 15, 2026"
+
+Math:
+{{ $now.plus({ days: 7 }) }}                  7 days later
+{{ $now.plus({ hours: 3, minutes: 30 }) }}
+{{ $now.minus({ months: 1 }) }}               1 month ago
+{{ $now.startOf("day") }}                     today 00:00
+{{ $now.startOf("month") }}                   1st of month
+{{ $now.endOf("week") }}                      end of week
+
+Parse:
+{{ DateTime.fromISO("2026-05-15") }}
+{{ DateTime.fromFormat("15/05/2026", "dd/MM/yyyy") }}
+{{ DateTime.fromMillis(1715000000000) }}
+
+Timezone:
+{{ $now.setZone("Asia/Shanghai") }}
+{{ $now.zoneName }}                           "Asia/Shanghai"`}
+</TerminalCell>
+
+## Objects
+
+<TerminalCell filename="objects.txt" runTag="📋">
+{`{{ obj.field }}                              access
+{{ obj["field"] }}                           non-ASCII keys
+{{ obj?.a?.b?.c }}                           optional chain
+
+{{ Object.keys($json) }}                     ["a", "b"]
+{{ Object.values($json) }}                   [1, 2]
+{{ Object.entries($json) }}                  [["a", 1], ["b", 2]]
+
+{{ { ...obj1, ...obj2 } }}                   shallow merge
+{{ JSON.parse(JSON.stringify(obj)) }}        deep clone
+
+Defaults:
+{{ obj.field || "default" }}                 if falsy
+{{ obj.field ?? "default" }}                 only null/undefined`}
+</TerminalCell>
+
+## Conditionals / Ternary
+
+<TerminalCell filename="conditional.txt" runTag="📋">
+{`{{ condition ? a : b }}                      if-else one-liner
+{{ cond1 ? a : cond2 ? b : c }}              chained
+{{ $json.score > 60 ? 'pass' : 'fail' }}
+
+Short-circuit:
+{{ active && "✓" }}                          "✓" if active truthy
+{{ name || "(anonymous)" }}                  fallback if empty`}
+</TerminalCell>
+
+## Regex
+
+<TerminalCell filename="regex.txt" runTag="📋">
+{`{{ "hello123".match(/\\d+/)[0] }}             → "123"
+{{ "a.b.c".replace(/\\./g, "_") }}            → "a_b_c"
+{{ /\\d+/.test("hello123") }}                 → true
+
+Common patterns:
+/^\\d+$/                                      digits only
+/^[\\w.-]+@[\\w.-]+\\.\\w+$/                  email
+/^https?:\\/\\//                              starts with http(s)
+
+⚠ Inside expressions, backslashes must be doubled`}
+</TerminalCell>
+
+## JSON
+
+<TerminalCell filename="json.txt" runTag="📋">
+{`{{ JSON.stringify($json) }}                  obj → string
+{{ JSON.stringify($json, null, 2) }}         pretty
+{{ JSON.parse('{"a":1}') }}                  string → obj`}
+</TerminalCell>
+
+<TipCallout type="tip" title="Expression editor">
+  
+  Before writing any complex expression, run it in the n8n **expression editor** — live Result on the right. Saves 10× the time over "write it, run workflow, find error, fix" cycles.
+  
+</TipCallout>
+
+Next: [Glossary](../glossary/).

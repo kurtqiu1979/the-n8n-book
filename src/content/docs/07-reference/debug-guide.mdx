@@ -1,0 +1,167 @@
+---
+title: 调试指南 · "为什么我的 workflow 不跑"
+description: 按症状定位问题 · 5 大常见故障 + 排查树
+sidebar:
+  order: 5
+  label: 7.4 调试指南
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 7 部分 · 调试指南</span>
+
+新手最痛的两小时：workflow 不跑也没报错。这一页**按症状**带你定位问题，**5 个最常见故障**全都列了排查树。
+
+## 通用调试三步法
+
+<TerminalCell filename="debug-3-steps.txt" runTag="🔧">
+{`遇到任何问题，按这个顺序：
+
+第 1 步：看 Executions
+  底部 Executions tab → 最近一次 → 点开
+  - 哪个节点变红了？
+  - 节点输出长啥样？跟预期差多少？
+
+第 2 步：分段测试
+  Disable Node 把可疑节点之后的全 disable
+  → 看上半段是不是真按预期出数据
+
+第 3 步：Pin Data + 重跑
+  问题节点的输入 Pin 住
+  → 反复改参数测试，不用每次跑完整链路`}
+</TerminalCell>
+
+## 症状 1 · 一切看起来都 OK 但 workflow 就是没启动
+
+<TerminalCell filename="symptom-1.txt" runTag="🩺">
+{`检查清单：
+
+□ Workflow 是否处于 Active 状态？
+  → 右上角的 Active / Inactive 开关
+  → Trigger 类 workflow 必须 Active
+
+□ 触发器配置是否正确？
+  - Schedule:  cron 表达式是否对？时区？
+  - Webhook:   用 Production URL 而非 Test URL？
+  - App Trigger: 凭证是否过期？webhook 是否注册成功？
+
+□ 是否本地能跑、线上不跑？
+  → 检查环境变量、凭证在两个环境都配了？
+
+□ 用 Webhook Trigger?
+  → 看节点上方的 "Listen for test event" 是否消失
+  → curl 直接打 Production URL 测试
+  → 检查防火墙 / 反向代理是否拦截`}
+</TerminalCell>
+
+## 症状 2 · workflow 跑了但下游节点没数据
+
+<TerminalCell filename="symptom-2.txt" runTag="🩺">
+{`常见原因：
+
+□ 上游节点输出 0 个 items
+  → Filter / IF 把所有 items 过滤掉了
+  → 上游 API 返回空数组
+  
+□ "对 0 个 item 执行" 不报错，只是悄悄空跑
+  → 加 IF 检查 $json 是否合法，没数据时显式 Stop and Error
+
+□ Merge 节点用错模式
+  → §4.2 的 5 种模式各自语义不同
+
+□ SplitInBatches 导致下游迭代关系断裂
+  → 用 .first() 替代 .item 引用`}
+</TerminalCell>
+
+## 症状 3 · 表达式不生效
+
+<TerminalCell filename="symptom-3.txt" runTag="🩺">
+{`(详见 §3.5 新手 5 坑)
+
+□ 输入框背景是不是粉色？
+  → 不是 → 点 fx 切到表达式模式
+
+□ 表达式模式下字符串首字符是不是 "="？
+  → 在 JSON 手填时容易漏
+
+□ 用 .item 但有 Merge/SplitInBatches?
+  → 改用 .first() 或 .itemMatching($itemIndex)
+
+□ 数字字段加法变字符串拼接?
+  → Number($json.x) 显式转
+
+□ 嵌套字段 undefined 报错?
+  → 用 ?. 安全链 + ?? 默认值`}
+</TerminalCell>
+
+## 症状 4 · 节点报"401 / 403 / Permission Denied"
+
+<TerminalCell filename="symptom-4.txt" runTag="🩺">
+{`几乎 100% 是凭证问题。
+
+□ 凭证测试通过吗？
+  → 凭证编辑页右下角 "Test step" 必须先绿勾
+
+□ OAuth 凭证过期？
+  → Long-idle OAuth 会失效；重新 "Connect my account"
+
+□ OAuth scope 给够了吗？
+  → 应用配置时漏勾某个权限 → 节点跑不通某些操作
+
+□ API Key 类型选对了？
+  → 有的应用区分 "Test Key" / "Live Key" / "Read Key"
+
+□ 速率超限？
+  → 错误信息含 "429" → 加 Loop Over Items 限速`}
+</TerminalCell>
+
+## 症状 5 · workflow 间歇性失败（有时好有时坏）
+
+<TerminalCell filename="symptom-5.txt" runTag="🩺">
+{`常见原因：
+
+□ 外部 API 不稳定
+  → 加 Retry On Fail（节点 Settings tab）
+  → Max Tries: 3, Wait: 2s with jitter
+
+□ 数据本身有"坏行"
+  → 个别 item 字段缺失导致表达式爆
+  → 加 Continue On Fail + 下游 IF 检查 $json.error
+
+□ 并发竞争
+  → 多个执行同时 INSERT 同一行
+  → 用 Postgres 唯一索引 + ON CONFLICT 处理
+
+□ Wait 节点卡死
+  → 检查 EXECUTIONS_DATA_PRUNE 配置
+  → 数据库膨胀拖慢恢复`}
+</TerminalCell>
+
+## 万能查日志姿势
+
+<TerminalCell filename="universal-log.txt" runTag="🔍">
+{`A. 编辑器内：
+   底部 Executions tab → 任意 execution → 点节点看 I/O
+
+B. n8n 服务端日志（Docker）：
+   docker logs n8n -f --tail 100
+
+C. 启用更详细日志（环境变量）：
+   N8N_LOG_LEVEL=debug   ← 自托管 .env
+
+D. 单节点调试输出：
+   加一个 Set 节点把中间变量赋给一个临时字段
+   下游再看那个字段值
+
+E. 浏览器开发者工具：
+   F12 → Network → 看节点 / API 调用的实际 HTTP 请求`}
+</TerminalCell>
+
+<TipCallout type="warn" title="最重要的一条建议">
+  
+  **不要靠想象**。打开 Executions 看节点**真实的**输入输出——99% 的"为什么不对"都是你的预期跟实际数据不符。Pin Data 让你能反复 inspect 这份"真相"。
+  
+</TipCallout>
+
+下一节[资源导航](../resources/) —— 学完这本书还想往哪走？

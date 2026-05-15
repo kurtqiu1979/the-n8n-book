@@ -1,0 +1,97 @@
+---
+title: Node Cheat Sheet
+description: 60+ core nodes · grouped by purpose + alphabetical index · one page lookup
+sidebar:
+  order: 2
+  label: 7.1 Node Cheat Sheet
+---
+
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Part 7 · Node Cheat Sheet</span>
+
+n8n has 500+ nodes; 80% of workflows use about 60. This page lists the common ones, indexed two ways: **by purpose** and **alphabetically**.
+
+## By purpose
+
+### Triggers
+
+| Node | Use |
+|---|---|
+| Manual Trigger | Click-to-run (debug) |
+| Schedule Trigger | Time-based (Cron) |
+| Webhook | Listen for HTTP requests |
+| Chat Trigger | Built-in chat UI |
+| Execute Sub-workflow Trigger | Called by other workflows |
+| Error Trigger | Fires on workflow failure |
+
+### App Triggers
+
+Telegram · Slack · Gmail · GitHub · Stripe · Shopify · Notion · Airtable · Google Sheets · Google Calendar · Typeform · RSS Feed
+
+### Core / Data ops
+
+| Node | Use |
+|---|---|
+| Set / Edit Fields | Add/modify/delete/rename fields |
+| IF | Binary branching |
+| Switch | Multi-way routing |
+| Merge | Combine two streams (5 modes) |
+| Loop Over Items | Batch iteration / rate-limit |
+| Split Out | Array field → multiple items |
+| Aggregate | Multi-item → single |
+| Sort / Filter / Limit | Self-explanatory |
+| Remove Duplicates | Dedup |
+| Code | Write JS / Python |
+| Wait | Pause N sec/min/days |
+| Stop and Error | Manually fail |
+
+### HTTP / Communication
+
+HTTP Request · Respond to Webhook · GraphQL · MQTT
+
+### AI / LangChain
+
+AI Agent · OpenAI Chat Model · Anthropic Chat Model · Ollama Chat Model · Window Buffer Memory · Summary Buffer Memory · Postgres Chat Memory · OpenAI Embeddings · Pinecone Vector Store · Qdrant Vector Store · Vector Store Tool · HTTP Request Tool · Workflow Tool · Recursive Character Text Splitter · Default Data Loader
+
+### Databases
+
+Postgres · MySQL · MongoDB · Redis · Supabase
+
+### Files / Storage
+
+Google Drive · Dropbox · OneDrive · AWS S3 · FTP / SFTP · Read/Write Files · Extract from File · Edit Image
+
+### Email / Messaging
+
+Email Send · Gmail · Slack · Discord · Telegram · Microsoft Teams · Twilio
+
+### Content platforms
+
+Notion · Airtable · Google Sheets · Twitter/X · LinkedIn · Medium · YouTube · WordPress
+
+### E-commerce / Payments / CRM
+
+Stripe · Shopify · HubSpot · Salesforce · Pipedrive
+
+## Alphabetical
+
+A-D · AI Agent · Airtable · Anthropic · AWS S3 · Calendar · Chat Trigger · Code · Cohere · Discord · Dropbox · DALL-E
+
+E-H · Edit Fields · Email Send · Error Trigger · Extract from File · Filter · FTP · Gmail · Google Drive · Google Sheets · GraphQL · GitHub · HTTP Request · HubSpot
+
+I-N · IF · Intercom · JSON · LinkedIn · Loop Over Items · Mailchimp · Manual Trigger · Medium · Merge · MongoDB · MQTT · MySQL · Notion
+
+O-S · Ollama · OneDrive · OpenAI · PayPal · Pinecone · Pipedrive · Postgres · Qdrant · Reddit · Redis · Respond to Webhook · RSS Feed · Salesforce · Schedule · Set · SFTP · Shopify · Slack · Sort · Split Out · Stripe · Supabase · Switch
+
+T-Z · Telegram · Teams · Twilio · Twitter · Typeform · Vector Store Tool · Wait · Webhook · WhatsApp · WordPress · YouTube
+
+<TipCallout type="tip" title="Still can't find it?">
+  
+  1. Search the n8n node library — fuzzy match, try synonyms
+  2. No built-in node? Use **HTTP Request** + the app's API docs
+  3. Self-hosted users can install [community nodes](https://www.npmjs.com/search?q=n8n-nodes-) (300+)
+  
+</TipCallout>
+
+Next: [Expression cheat sheet](../expressions-cheatsheet/).

@@ -1,0 +1,111 @@
+---
+title: Resources
+description: Official docs · community · YouTube · template library · advanced paths
+sidebar:
+  order: 6
+  label: 7.5 Resources
+---
+
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Part 7 · Resources</span>
+
+Signposts for "I want to go deeper." Pick by intent — don't try to consume everything.
+
+## 🏛 Official
+
+| Resource | Link | When to use |
+|---|---|---|
+| n8n Docs | [docs.n8n.io](https://docs.n8n.io) | Node params, config, API details |
+| n8n Courses | [docs.n8n.io/courses](https://docs.n8n.io/courses/) | Official "certified" learning path |
+| n8n Workflow Library | [n8n.io/workflows](https://n8n.io/workflows/) | 9600+ community workflows |
+| n8n Integrations | [n8n.io/integrations](https://n8n.io/integrations/) | Find if a specific app has a node |
+| n8n GitHub | [github.com/n8n-io/n8n](https://github.com/n8n-io/n8n) | Bug reports, code contributions |
+| n8n Changelog | [docs.n8n.io/release-notes](https://docs.n8n.io/release-notes/) | Recent version changes |
+
+## 💬 Community
+
+| Resource | Link | Vibe |
+|---|---|---|
+| n8n Community Forum | [community.n8n.io](https://community.n8n.io) | Q&A, official + core contributors active |
+| r/n8n (Reddit) | [reddit.com/r/n8n](https://reddit.com/r/n8n) | Case sharing, gripes, feature discussions |
+| n8n Discord | [discord.gg/n8n](https://discord.gg/n8n) | Real-time chat, event announcements |
+| Awesome n8n | [github.com/restyler/awesome-n8n](https://github.com/restyler/awesome-n8n) | Curated community resources |
+
+## 📺 YouTube channels
+
+| Channel | Focus |
+|---|---|
+| **n8n Official** | New feature demos |
+| **Nate Herk** | AI Agent deep dives |
+| **Maxx Romano** | Business automation cases |
+| **Cody Schneider** | Advanced patterns, enterprise |
+| **AI Workshop** | LangChain + n8n series |
+
+## 🔧 Advanced tooling
+
+### Self-hosting depth
+
+- **PostgreSQL tuning** — required as execution data grows
+- **Redis Queue Mode** — single instance → multi-worker horizontal scale
+- **Reverse Proxy** — Nginx / Caddy / Traefik for HTTPS
+- **Backup strategy** — encryption key + execution data + workflow definitions
+
+### AI deepening
+
+- **LangChain JS docs** — [js.langchain.com](https://js.langchain.com)
+- **OpenAI Cookbook** — [cookbook.openai.com](https://cookbook.openai.com)
+- **Anthropic Claude docs** — [docs.anthropic.com](https://docs.anthropic.com)
+- **Local LLMs** — Ollama / LM Studio / vLLM
+- **Vector DB comparison** — Pinecone / Qdrant / Weaviate / Chroma
+
+### Data / Integration
+
+- **Postgres pgvector** — vector capability in your existing PG
+- **Supabase** — Postgres + Auth + Storage in one
+- **Apache Airflow** — when n8n isn't enough (more programmer-flavored)
+
+## 🎓 Advanced paths (by goal)
+
+### "I want to build a product on n8n"
+1. Learn **Queue Mode** + multi-worker deployment
+2. Learn **RBAC** / multi-tenancy / team management
+3. Learn **error handling + monitoring** for production
+4. Read [restyler/awesome-n8n](https://github.com/restyler/awesome-n8n) "production patterns"
+
+### "I want to build AI Agents with n8n"
+1. Do **every challenge** in Part 5
+2. Read LangChain JS docs cover-to-cover
+3. Play with Pinecone / Qdrant, build 5+ RAG demos
+4. Join LangChain Discord / r/LocalLLaMA
+
+### "I want to develop custom n8n nodes"
+1. Learn TypeScript (if not yet)
+2. Read [n8n-nodes-starter](https://github.com/n8n-io/n8n-nodes-starter)
+3. Read source of a community node or two (e.g. `n8n-nodes-tools`)
+4. Publish to npm
+
+### "I want to migrate from Make / Zapier"
+1. Check [docs.n8n.io migration guides](https://docs.n8n.io)
+2. Recreate existing Zaps using Part 6 cases as templates
+3. Switch to Cloud (less ops) or Docker (cheaper at scale)
+
+## 📚 Adjacent reading
+
+- **Automate the Boring Stuff** — old classic, automation thinking
+- **Designing Data-Intensive Applications** — workflows are data flows
+- **The Pragmatic Programmer** — DRY, reusability, abstraction
+
+<TipCallout type="tip" title="Closing thought">
+  
+  This book ends here. But your n8n journey is just starting — monthly releases, weekly AI ecosystem changes. **Subscribing to changelog + community feeds** beats re-reading this book 10×.
+  
+  PRs and case contributions welcome at [The n8n Book GitHub](https://github.com/kurtqiu1979/the-n8n-book) — this book is open source, always evolving.
+  
+</TipCallout>
+
+## 🙏 Acknowledgments
+
+- The n8n team for making such a great open-source tool
+- The countless contributors on community.n8n.io for cases and answers
+- You, for reading this book

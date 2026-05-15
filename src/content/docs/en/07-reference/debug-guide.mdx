@@ -1,0 +1,167 @@
+---
+title: Debug Guide · "Why Isn't My Workflow Running"
+description: Diagnose by symptom · 5 most common failure modes + decision trees
+sidebar:
+  order: 5
+  label: 7.4 Debug Guide
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Part 7 · Debug Guide</span>
+
+The most painful two hours of any beginner: workflow won't run, no error. This page diagnoses **by symptom**, with **5 common failure modes** and decision trees.
+
+## Universal 3-step debug
+
+<TerminalCell filename="debug-3-steps.txt" runTag="🔧">
+{`Whatever's wrong, in order:
+
+Step 1: Check Executions
+  Bottom Executions tab → latest → open it
+  - Which node turned red?
+  - What's the output shape? How far off from expectation?
+
+Step 2: Segment-test
+  Disable nodes after the suspect one
+  → Verify the upstream half emits expected data
+
+Step 3: Pin Data + iterate
+  Pin the suspect node's input
+  → Re-test changes without running the full chain`}
+</TerminalCell>
+
+## Symptom 1 · Everything looks fine but the workflow didn't fire
+
+<TerminalCell filename="symptom-1.txt" runTag="🩺">
+{`Checklist:
+
+□ Is the workflow Active?
+  → Active/Inactive switch top-right
+  → Trigger workflows MUST be Active
+
+□ Trigger config correct?
+  - Schedule:  cron expression? timezone?
+  - Webhook:   using Production URL not Test URL?
+  - App Trigger: credentials expired? webhook registered?
+
+□ Works locally, not in production?
+  → Env vars + credentials configured in both envs?
+
+□ Using Webhook Trigger?
+  → "Listen for test event" disappeared from the node?
+  → curl the Production URL directly to test
+  → Check firewall / reverse proxy doesn't block`}
+</TerminalCell>
+
+## Symptom 2 · Workflow runs but downstream nodes get no data
+
+<TerminalCell filename="symptom-2.txt" runTag="🩺">
+{`Common causes:
+
+□ Upstream emits 0 items
+  → Filter / IF eliminated all items
+  → Upstream API returned empty array
+  
+□ "Execute against 0 items" doesn't error, just silently no-ops
+  → Add an IF checking $json validity; Stop and Error if absent
+
+□ Merge used the wrong mode
+  → §4.2's 5 modes each mean different things
+
+□ SplitInBatches broke iteration pairing
+  → Use .first() instead of .item`}
+</TerminalCell>
+
+## Symptom 3 · Expression doesn't evaluate
+
+<TerminalCell filename="symptom-3.txt" runTag="🩺">
+{`(See §3.5 for the 5 traps)
+
+□ Is the input background pink?
+  → No → click fx to switch to expression mode
+
+□ Is the first char "=" in expression mode?
+  → Easy to forget when hand-editing JSON
+
+□ Using .item with Merge/SplitInBatches in between?
+  → Switch to .first() or .itemMatching($itemIndex)
+
+□ Number addition becomes string concatenation?
+  → Number($json.x) to cast explicitly
+
+□ Nested field undefined error?
+  → Use ?. optional chain + ?? default`}
+</TerminalCell>
+
+## Symptom 4 · Node returns "401 / 403 / Permission Denied"
+
+<TerminalCell filename="symptom-4.txt" runTag="🩺">
+{`Almost always a credential issue.
+
+□ Did the credential test pass?
+  → Credential edit page → "Test step" must turn green first
+
+□ OAuth credential expired?
+  → Long-idle OAuth tokens go stale; click "Connect my account" again
+
+□ OAuth scopes sufficient?
+  → Missed a permission during app config → some operations fail
+
+□ Right API key type selected?
+  → Some apps differentiate Test Key / Live Key / Read Key
+
+□ Rate-limited?
+  → Error contains "429" → add Loop Over Items to throttle`}
+</TerminalCell>
+
+## Symptom 5 · Intermittent failures (works sometimes)
+
+<TerminalCell filename="symptom-5.txt" runTag="🩺">
+{`Common causes:
+
+□ External API is flaky
+  → Add Retry On Fail (node Settings tab)
+  → Max Tries: 3, Wait: 2s with jitter
+
+□ Bad rows in the data
+  → A specific item has a missing field, crashes expression
+  → Add Continue On Fail + downstream IF checking $json.error
+
+□ Concurrent race condition
+  → Multiple executions INSERT the same row
+  → Postgres unique index + ON CONFLICT
+
+□ Wait node stuck
+  → Check EXECUTIONS_DATA_PRUNE configuration
+  → Bloated DB slows down resumes`}
+</TerminalCell>
+
+## Universal log access
+
+<TerminalCell filename="universal-log.txt" runTag="🔍">
+{`A. Inside the editor:
+   Bottom Executions tab → any execution → click node to see I/O
+
+B. n8n server logs (Docker):
+   docker logs n8n -f --tail 100
+
+C. Enable verbose logs (env):
+   N8N_LOG_LEVEL=debug   ← self-host .env
+
+D. Single-node debug output:
+   Add a Set node copying intermediate vars to a temp field
+   Downstream see that field's value
+
+E. Browser DevTools:
+   F12 → Network → see actual HTTP requests by nodes / API calls`}
+</TerminalCell>
+
+<TipCallout type="warn" title="The single most important rule">
+  
+  **Don't rely on imagination.** Open Executions and look at the **actual** I/O — 99% of "why isn't this right" is the gap between your expectation and the real data. Pin Data lets you inspect that truth repeatedly.
+  
+</TipCallout>
+
+Next: [Resources](../resources/) — where to go after this book.

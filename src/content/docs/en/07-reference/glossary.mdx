@@ -1,0 +1,157 @@
+---
+title: Glossary
+description: 80+ n8n core terms · English ↔ Chinese · so the official docs make sense
+sidebar:
+  order: 4
+  label: 7.3 Glossary
+---
+
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Part 7 · Glossary</span>
+
+Stuck on terminology while reading n8n docs? Look it up here.
+
+## Core concepts
+
+| English | 中文 | One-line meaning |
+|---|---|---|
+| Workflow | 工作流 | A set of connected nodes — the automation itself |
+| Node | 节点 | The basic unit of a workflow |
+| Connection | 连线 | Direction of data flow between nodes |
+| Trigger | 触发器 | Entry node that starts a workflow |
+| Action | 动作节点 | Node that performs a specific action |
+| Execution | 执行 | One run instance of a workflow |
+| Item | 数据项 | One JSON object in the data array |
+| Binary | 二进制数据 | File attachment (image, PDF, etc.) |
+| Credential | 凭证 | Identity info for API calls (encrypted) |
+| Webhook | Webhook | HTTP endpoint that listens for requests |
+| Active / Inactive | 激活 / 未激活 | Whether the workflow runs in the background |
+| Pinned Data | 钉住的数据 | Locked node output for debugging |
+
+## Expressions
+
+| English | 中文 | Meaning |
+|---|---|---|
+| Expression | 表达式 | JS code in `{{ }}` |
+| Expression Mode | 表达式模式 | Input field is "evaluated" |
+| Fixed Value | 固定值（模式） | Input field is "literal" |
+| `$json` | (current item's JSON) | Special n8n-injected variable |
+| `$('NodeName')` | Reference a node | Cross-node data access |
+| `.item` | Smart-paired item | Use cautiously |
+| `.first()` / `.last()` / `.all()` | First / Last / All items |
+| Luxon | (a JS date lib) | `$now` and friends built on it |
+
+## Node types
+
+| English | 中文 |
+|---|---|
+| Core Node | 内置节点 |
+| App Node | 应用节点 |
+| Trigger Node | 触发器节点 |
+| Sub Node | 子节点（挂载件） |
+| Root Node | 主节点（如 AI Agent） |
+| Custom Node | 自定义节点 |
+| Community Node | 社区节点 |
+
+## Flow logic
+
+| English | 中文 |
+|---|---|
+| Branch | 分支 |
+| Merge | 合并 |
+| Loop / Iteration | 循环 / 迭代 |
+| Batch | 批次 |
+| Rate Limit | 速率限制 |
+| Continue On Fail | 出错时继续 |
+| Error Trigger | 错误触发器 |
+| Retry | 重试 |
+| Sub-workflow | 子工作流 |
+| Stop and Error | 停止并报错 |
+
+## AI / LangChain
+
+| English | 中文 | Meaning |
+|---|---|---|
+| AI Agent | AI 智能体 | LLM + tool-calling |
+| Chat Model | 聊天模型 | The LLM itself (OpenAI / Claude / etc.) |
+| LLM | 大语言模型 | Large Language Model |
+| Memory | 记忆 | Multi-turn conversation context |
+| Tool | 工具 | A capability the Agent can call |
+| Embedding | 嵌入 | Text → vector |
+| Vector Store | 向量库 | Database storing vectors (Pinecone etc.) |
+| RAG | 检索增强生成 | Retrieval-Augmented Generation |
+| Prompt | 提示词 | Input to the LLM |
+| System Message | 系统消息 | LLM role definition |
+| Token | 令牌 | LLM billing/length unit |
+| Temperature | 温度 | 0=deterministic, 1=creative |
+| Hallucination | 幻觉 | LLM making things up |
+| Chain of Thought | 思维链 | LLM reasoning step-by-step |
+| ReAct | (Reason + Act) | Agent's think-act loop pattern |
+
+## Data formats
+
+| English | 中文 |
+|---|---|
+| JSON | JSON |
+| Array | 数组 |
+| Object | 对象 |
+| Field | 字段 |
+| Property | 属性 |
+| Schema | 模式 / 结构 |
+| Payload | 载荷 / 数据体 |
+| Header | 头（HTTP / Email） |
+| Query String | 查询字符串 |
+| Body | 请求体 |
+| Response | 响应 |
+| Status Code | 状态码 |
+
+## Deployment / Ops
+
+| English | 中文 |
+|---|---|
+| Self-hosted | 自托管 |
+| Cloud | 云托管 |
+| Docker | Docker |
+| Environment Variable | 环境变量 |
+| Encryption Key | 加密密钥 |
+| Queue Mode | 队列模式 |
+| Worker | 工作进程 |
+| Migration | 数据库迁移 |
+| Backup | 备份 |
+| Pruning | 清理（旧 execution 数据） |
+
+## Collaboration
+
+| English | 中文 |
+|---|---|
+| Owner | 所有者 |
+| Editor | 编辑者 |
+| Sharing | 共享 |
+| Project | 项目 |
+| Folder | 文件夹 |
+| Tag | 标签 |
+| Version | 版本 |
+| Audit Log | 审计日志 |
+| RBAC | 基于角色的访问控制 |
+| SSO | 单点登录 |
+
+## Pricing / Business
+
+| English | 中文 |
+|---|---|
+| Execution Credit | 执行额度 |
+| Active Workflow | 激活的工作流 |
+| Paid Plan | 付费方案 |
+| Free Tier | 免费层 |
+| Self-host License Key | 自托管许可证密钥 |
+
+<TipCallout type="tip" title="Tips for reading n8n docs">
+  
+  - n8n.io has a translate button (bottom right) — machine translation, decent
+  - Stuck on a term? **Check here first**, then the English original
+  - Node parameter names stay English (Resource, Operation) — don't try to translate them
+  
+</TipCallout>
+
+Next: [Debug guide](../debug-guide/) — "why isn't my workflow running."

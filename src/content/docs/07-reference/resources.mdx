@@ -1,0 +1,111 @@
+---
+title: 资源导航
+description: 官方文档 · 社区 · YouTube · 模板库 · 进阶学习路径
+sidebar:
+  order: 6
+  label: 7.5 资源导航
+---
+
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 7 部分 · 资源导航</span>
+
+学完整本书后，"还想再深入" 的路标。**按你的目的**找对应资源——别贪多。
+
+## 🏛 官方权威
+
+| 资源 | 链接 | 何时去 |
+|---|---|---|
+| n8n 官方文档 | [docs.n8n.io](https://docs.n8n.io) | 节点参数、配置、API 细节 |
+| n8n 官方课程 | [docs.n8n.io/courses](https://docs.n8n.io/courses/) | 想要"官方认证学习路径" |
+| n8n 工作流模板库 | [n8n.io/workflows](https://n8n.io/workflows/) | 9600+ 社区贡献的 workflow |
+| n8n 节点列表 | [n8n.io/integrations](https://n8n.io/integrations/) | 找特定应用是否有节点 |
+| n8n GitHub | [github.com/n8n-io/n8n](https://github.com/n8n-io/n8n) | 报 bug / 贡献代码 / 看源码 |
+| n8n Changelog | [docs.n8n.io/release-notes](https://docs.n8n.io/release-notes/) | 看最近版本变化 |
+
+## 💬 社区
+
+| 资源 | 链接 | 风格 |
+|---|---|---|
+| n8n Community Forum | [community.n8n.io](https://community.n8n.io) | 提问、官方+核心贡献者活跃 |
+| r/n8n (Reddit) | [reddit.com/r/n8n](https://reddit.com/r/n8n) | 案例分享、吐槽、新功能讨论 |
+| n8n Discord | [discord.gg/n8n](https://discord.gg/n8n) | 实时交流、活动公告 |
+| Awesome n8n | [github.com/restyler/awesome-n8n](https://github.com/restyler/awesome-n8n) | 社区精选资源大全 |
+
+## 📺 YouTube 频道（学完本书后看 visual demo）
+
+| 频道 | 特色 |
+|---|---|
+| **n8n 官方** | 新功能官方演示 |
+| **Nate Herk** | AI Agent 实战、深度 |
+| **Maxx Romano** | 业务自动化案例 |
+| **Cody Schneider** | 进阶模式、企业级 |
+| **AI Workshop** | LangChain + n8n 系列 |
+
+## 🔧 进阶工具链
+
+### 自托管深化
+
+- **PostgreSQL 调优** —— 大量 execution 数据后必须考虑
+- **Redis Queue Mode** —— 单实例 → 多 worker 横向扩展
+- **Reverse Proxy** —— Nginx / Caddy / Traefik 配 HTTPS
+- **Backup 策略** —— 凭证加密密钥 + execution 数据 + workflow 定义
+
+### AI 玩深
+
+- **LangChain JS 文档** —— [js.langchain.com](https://js.langchain.com)（n8n AI 节点底层）
+- **OpenAI Cookbook** —— [cookbook.openai.com](https://cookbook.openai.com)
+- **Anthropic Claude 文档** —— [docs.anthropic.com](https://docs.anthropic.com)
+- **本地 LLM** —— Ollama / LM Studio / vLLM
+- **向量库选型** —— Pinecone / Qdrant / Weaviate / Chroma 对比
+
+### 数据 / 集成
+
+- **Postgres pgvector** —— 在你的 PG 里加向量能力
+- **Supabase** —— Postgres + Auth + Storage 一体化
+- **Apache Airflow** —— n8n 不够用时的下一站（更程序员化）
+
+## 🎓 进阶学习路径（按目标）
+
+### "我想用 n8n 做产品"
+1. 学 **Queue Mode** + 多 worker 部署
+2. 学 **RBAC** / 多租户 / 团队管理
+3. 学 **错误处理 + 监控** 生产实践
+4. 读 [restyler/awesome-n8n](https://github.com/restyler/awesome-n8n) 的"production patterns"
+
+### "我想用 n8n 做 AI Agent"
+1. 把本书第 5 部分**所有挑战**都做一遍
+2. 通读 LangChain JS 文档
+3. 玩 Pinecone / Qdrant，做 5+ 个 RAG demo
+4. 加入 LangChain Discord / r/LocalLLaMA
+
+### "我想给 n8n 开发自定义节点"
+1. 学 TypeScript（如果还不会）
+2. 看 [n8n-nodes-starter](https://github.com/n8n-io/n8n-nodes-starter)
+3. 看几个 community node 的源码（如 `n8n-nodes-tools`）
+4. 发布到 npm
+
+### "我想从 Make / Zapier 迁过来"
+1. 看 [docs.n8n.io migration guides](https://docs.n8n.io)
+2. 把现有 Zap 一个个用本书第 6 部分对照重做
+3. 转 Cloud 版省运维，或 Docker 自托管省钱
+
+## 📚 周边阅读
+
+- **《Automate the Boring Stuff》** —— 老经典，理解"自动化思维"
+- **《Designing Data-Intensive Applications》** —— 工作流就是数据流，这本书是基石
+- **《The Pragmatic Programmer》** —— DRY、可复用性、抽象层次
+
+<TipCallout type="tip" title="最后的话">
+  
+  这本书就到这里。但你跟 n8n 的旅程才刚开始——n8n 月度迭代，AI 生态周更，**保持订阅 changelog + 社区动态**比把这本书读 10 遍更重要。
+  
+  欢迎到 [The n8n Book GitHub](https://github.com/kurtqiu1979/the-n8n-book) 提 Issue / PR / 案例贡献——这本书是开源的，永远在演进。
+  
+</TipCallout>
+
+## 🙏 致谢
+
+- 感谢 n8n 团队做出这个优秀的开源工具
+- 感谢 community.n8n.io 上无数贡献者的案例和答疑
+- 感谢正在读这本书的你

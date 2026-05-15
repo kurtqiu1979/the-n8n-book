@@ -1,0 +1,157 @@
+---
+title: 中英术语对照表
+description: 80+ n8n 核心术语 · 中文 ↔ 英文 · 读官方文档不再卡壳
+sidebar:
+  order: 4
+  label: 7.3 术语对照
+---
+
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 7 部分 · 术语对照表</span>
+
+读 n8n 官方英文文档时被术语卡住？这页全收。**双向查**：中文找英文 / 英文找中文都行。
+
+## 核心概念
+
+| 英文 | 中文 | 一句话解释 |
+|---|---|---|
+| Workflow | 工作流 | n8n 里一组节点连成的自动化流程 |
+| Node | 节点 | workflow 的基本组成单元 |
+| Connection | 连线 | 节点间的数据流向 |
+| Trigger | 触发器 | 启动 workflow 的入口节点 |
+| Action | 动作节点 | 执行具体操作的节点 |
+| Execution | 执行 | workflow 的一次运行实例 |
+| Item | 数据项 | 数据数组里的一个 JSON 对象 |
+| Binary | 二进制数据 | 文件附件（图片、PDF 等） |
+| Credential | 凭证 | 调用 API 的身份信息（加密存储） |
+| Webhook | Webhook | 监听 HTTP 请求的端点 |
+| Active / Inactive | 激活 / 未激活 | workflow 是否在后台运行 |
+| Pinned Data | 钉住的数据 | 调试时锁定的节点输出 |
+
+## 表达式
+
+| 英文 | 中文 | 说明 |
+|---|---|---|
+| Expression | 表达式 | `{{ }}` 包裹的 JS 代码 |
+| Expression Mode | 表达式模式 | 输入框的"求值"状态 (vs Fixed Value) |
+| Fixed Value | 固定值（模式） | 输入框的"字面量"状态 |
+| `$json` | (当前 item 的 JSON) | n8n 注入的特殊变量 |
+| `$('NodeName')` | 引用某节点 | 跨节点取数据 |
+| `.item` | 智能配对的 item | 谨慎使用 |
+| `.first()` / `.last()` / `.all()` | 第一个 / 最后 / 全部 items |
+| Luxon | (一个 JS 日期库) | n8n 注入的 `$now` 等基于它 |
+
+## 节点类型
+
+| 英文 | 中文 |
+|---|---|
+| Core Node | 内置节点 |
+| App Node | 应用节点 |
+| Trigger Node | 触发器节点 |
+| Sub Node | 子节点（挂载件） |
+| Root Node | 主节点（如 AI Agent） |
+| Custom Node | 自定义节点 |
+| Community Node | 社区节点 |
+
+## 流程控制
+
+| 英文 | 中文 |
+|---|---|
+| Branch | 分支 |
+| Merge | 合并 |
+| Loop / Iteration | 循环 / 迭代 |
+| Batch | 批次 |
+| Rate Limit | 速率限制 |
+| Continue On Fail | 出错时继续 |
+| Error Trigger | 错误触发器 |
+| Retry | 重试 |
+| Sub-workflow | 子工作流 |
+| Stop and Error | 停止并报错 |
+
+## AI / LangChain
+
+| 英文 | 中文 | 一句话 |
+|---|---|---|
+| AI Agent | AI 智能体 | LLM + 工具调用 |
+| Chat Model | 聊天模型 | LLM 本体（OpenAI / Claude 等） |
+| LLM | 大语言模型 | Large Language Model |
+| Memory | 记忆 | 多轮对话上下文 |
+| Tool | 工具 | Agent 可调用的能力 |
+| Embedding | 嵌入 | 文本转向量 |
+| Vector Store | 向量库 | 存向量的数据库（Pinecone 等） |
+| RAG | 检索增强生成 | Retrieval-Augmented Generation |
+| Prompt | 提示词 | 给 LLM 的输入 |
+| System Message | 系统消息 | LLM 的角色定义 |
+| Token | 令牌 | LLM 计费/限长的最小单位 |
+| Temperature | 温度 | 0=确定、1=发散 |
+| Hallucination | 幻觉 | LLM 瞎编 |
+| Chain of Thought | 思维链 | LLM 一步步推理 |
+| ReAct | (Reason + Act) | Agent 的"想-做"循环模式 |
+
+## 数据格式
+
+| 英文 | 中文 |
+|---|---|
+| JSON | JSON |
+| Array | 数组 |
+| Object | 对象 |
+| Field | 字段 |
+| Property | 属性 |
+| Schema | 模式 / 结构 |
+| Payload | 载荷 / 数据体 |
+| Header | 头（HTTP / Email） |
+| Query String | 查询字符串 |
+| Body | 请求体 |
+| Response | 响应 |
+| Status Code | 状态码 |
+
+## 部署 / 运维
+
+| 英文 | 中文 |
+|---|---|
+| Self-hosted | 自托管 |
+| Cloud | 云托管 |
+| Docker | Docker |
+| Environment Variable | 环境变量 |
+| Encryption Key | 加密密钥 |
+| Queue Mode | 队列模式 |
+| Worker | 工作进程 |
+| Migration | 数据库迁移 |
+| Backup | 备份 |
+| Pruning | 清理（旧 execution 数据） |
+
+## 协作
+
+| 英文 | 中文 |
+|---|---|
+| Owner | 所有者 |
+| Editor | 编辑者 |
+| Sharing | 共享 |
+| Project | 项目 |
+| Folder | 文件夹 |
+| Tag | 标签 |
+| Version | 版本 |
+| Audit Log | 审计日志 |
+| RBAC | 基于角色的访问控制 |
+| SSO | 单点登录 |
+
+## 计费 / 商业
+
+| 英文 | 中文 |
+|---|---|
+| Execution Credit | 执行额度 |
+| Active Workflow | 激活的工作流 |
+| Paid Plan | 付费方案 |
+| Free Tier | 免费层 |
+| Self-host License Key | 自托管许可证密钥 |
+
+<TipCallout type="tip" title="读官方文档的小窍门">
+  
+  - n8n.io 右下角有"翻译"按钮支持机翻中文（不太准但能看）
+  - 卡住的术语**先查这页**，再查英文原文
+  - 节点参数名一般保留英文（如 "Resource"、"Operation"）—— **不要去翻译它们**，直接学英文
+  
+</TipCallout>
+
+下一节[调试指南](../debug-guide/) —— "为什么我的 workflow 不跑" 排障树。

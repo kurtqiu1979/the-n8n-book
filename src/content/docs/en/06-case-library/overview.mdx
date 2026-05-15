@@ -1,6 +1,6 @@
 ---
 title: Part 6 · Case Library
-description: 24 real-world workflows — each with backstory, visualized graph, downloadable JSON, and pitfall warnings
+description: 24 real-world workflows — each with backstory, visualized graph, downloadable JSON, pitfalls
 sidebar:
   order: 1
   label: Overview
@@ -10,26 +10,94 @@ import TipCallout from '../../../../components/TipCallout.astro';
 
 <span class="editorial-label">Part 6 · Overview</span>
 
-After Parts 1–5 you know how to build workflows from scratch. This part gives you **24 wheels you can just lift** — from a simple "daily email digest" to a full-blown "AI customer support with RAG".
+After Parts 1–5 you know how to build workflows from scratch. This part gives you **24 wheels you can just lift** — from a simple "daily email digest" to a full-blown "AI customer support with RAG."
 
 Every case includes:
-- 🎯 **Backstory** — what it solves, who needs it
-- 🔍 **Workflow diagram** — interactive (pan / zoom), embedded inline
-- 📋 **Downloadable Workflow JSON** — copy-paste into your own n8n
-- ⚠️ **Pitfall warnings** — which parameters most often go wrong
-- 🎁 **Extension challenges** — taking it further
+- 🎯 **Backstory**
+- 🔍 **Workflow diagram** (interactive, pan / zoom)
+- 📋 **Downloadable Workflow JSON**
+- ⚠️ **Pitfall warnings**
+- 🎁 **Extension challenges**
 
-## 8 thematic groups
+## All 24 Cases Index
 
-- 🤖 **AI Agents & Chatbots** (Telegram AI Bot / PDF RAG / AI Company Enrichment)
-- ✍️ **Content Ops & Social** (Multi-Platform Poster / YouTube SEO / Reddit Trends)
-- 🛒 **E-commerce & SaaS Sync** (Shopify → Notion / Stripe Failures / Trial Expiry)
-- 📅 **Personal Productivity / GTD** (Daily Email Digest / Calendar → Notion / Habit Bot)
-- 🔄 **Data Pipelines** (CSV → DB / API Polling Router / Multi-source Dedup)
-- 📣 **Marketing & CRM** (Lead Enrichment / Drip Campaigns / Typeform → Salesforce)
-- 🛠 **DevOps Lite** (Uptime Monitor / GitHub → Discord / Backup Audit)
-- 🎁 **Fun Projects** (Weather Wallpaper / AI Birthday Reminders / Personal RSS Butler)
+### 🤖 AI Assistants (3)
 
-<TipCallout type="warn" title="In progress">
-  All 24 cases are being rolled out group by group.
+| Diff | Case | Core nodes |
+|---|---|---|
+| 🟢 | [Telegram AI Chatbot](./01-ai-assistants/telegram-ai-bot/) | Telegram × AI Agent × Memory |
+| 🟡 | [PDF RAG Assistant](./01-ai-assistants/pdf-rag-assistant/) | Pinecone × Vector Store Tool |
+| 🟡 | [AI Company Enrichment](./01-ai-assistants/ai-company-enrichment/) | Airtable × AI JSON mode |
+
+### ✍️ Content Ops (3)
+
+| Diff | Case | Core nodes |
+|---|---|---|
+| 🟡 | [Multi-Platform Poster](./02-content-ops/multi-platform-poster/) | Notion × AI Rewriter × multi-branch |
+| 🟡 | [YouTube SEO Automation](./02-content-ops/youtube-seo/) | YouTube × AI × Captions API |
+| 🟢 | [Daily Reddit Trends](./02-content-ops/reddit-trends/) | Schedule × Split Out × AI |
+
+### 🛒 E-commerce (3)
+
+| Diff | Case | Core nodes |
+|---|---|---|
+| 🟢 | [Shopify Orders → Notion + Slack](./03-ecommerce/shopify-to-notion/) | Shopify Trigger × Notion |
+| 🟢 | [Stripe Failed Payments Alert](./03-ecommerce/stripe-failures/) | Stripe Trigger × IF × Slack |
+| 🟢 | [SaaS Trial Expiry Reminder](./03-ecommerce/trial-expiry/) | Postgres × Email |
+
+### 📅 Productivity (3)
+
+| Diff | Case | Core nodes |
+|---|---|---|
+| 🟢 | [Daily Email Digest](./04-productivity/daily-email-digest/) | Gmail × AI summarize |
+| 🟡 | [Calendar Events → Notion](./04-productivity/calendar-to-notion/) | GCal × AI × Notion |
+| 🟡 | [Daily Habit Bot](./04-productivity/habit-bot/) | Telegram dual-trigger × AI parse |
+
+### 🔄 Data Pipeline (3)
+
+| Diff | Case | Core nodes |
+|---|---|---|
+| 🟡 | [CSV → Database Pipeline](./05-data-pipeline/csv-to-database/) | GDrive × Extract × Postgres |
+| 🟡 | [API Polling Router](./05-data-pipeline/api-polling-router/) | HTTP × Split × Switch |
+| 🔴 | [Multi-Source Dedup & Merge](./05-data-pipeline/multi-source-dedup/) | 3 Sources × Merge × Code |
+
+### 📣 Marketing & CRM (3)
+
+| Diff | Case | Core nodes |
+|---|---|---|
+| 🟡 | [Lead Enrichment Pipeline](./06-marketing-crm/lead-enrichment/) | Webhook × Clearbit × HubSpot |
+| 🟡 | [Email Drip Campaign](./06-marketing-crm/drip-campaign/) | Wait × IF × long workflow |
+| 🟡 | [Typeform → Salesforce](./06-marketing-crm/typeform-to-salesforce/) | Typeform × AI Tag × SF |
+
+### 🛠 DevOps Lite (3)
+
+| Diff | Case | Core nodes |
+|---|---|---|
+| 🟢 | [Site Uptime Monitor](./07-devops/uptime-monitor/) | Schedule × HTTP × IF |
+| 🟢 | [GitHub Events → Discord](./07-devops/github-to-discord/) | GitHub Trigger × Switch |
+| 🟡 | [Backup Audit](./07-devops/backup-audit/) | S3 × Code × date check |
+
+### 🎁 Fun Projects (3)
+
+| Diff | Case | Core nodes |
+|---|---|---|
+| 🟡 | [AI Weather Wallpaper](./08-fun-projects/weather-wallpaper/) | wttr.in × DALL-E 3 × Drive |
+| 🟢 | [AI Birthday Reminder](./08-fun-projects/ai-birthday-reminder/) | Notion × AI × Telegram |
+| 🟡 | [Personal RSS Butler](./08-fun-projects/personal-rss-butler/) | RSS × Aggregate × AI Curator |
+
+## Difficulty legend
+
+- 🟢 **Easy** (15-20 min, 5-7 nodes)
+- 🟡 **Medium** (20-40 min, AI / multi-branch / long chains)
+- 🔴 **Hard** (30+ min, Code node / complex logic / multi-source)
+
+<TipCallout type="tip" title="How to use this part">
+  
+  - **Skim first**: read all 24 backstories, find the one closest to your need
+  - **Copy one**: bottom of each case has "Copy Workflow JSON" → paste into your n8n canvas
+  - **Tweak**: wiring is done; just swap credentials and parameters
+  - **Extend**: every case has "extension challenges" at the bottom
+  
 </TipCallout>
+
+Want quick lookups after the cases? Next: [**Part 7 · Reference Toolkit**](../../07-reference/overview/) — node cheatsheet, expression cheatsheet, glossary.

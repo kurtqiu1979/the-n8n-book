@@ -1,0 +1,171 @@
+---
+title: 节点速查表
+description: 60+ 核心节点 · 按用途分类 + 按字母索引 · 一页查全
+sidebar:
+  order: 2
+  label: 7.1 节点速查
+---
+
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 7 部分 · 节点速查表</span>
+
+n8n 有 500+ 节点，但 80% 的工作流只用其中 60 个。这一页按"用途"和"字母"双索引列出最常用节点，**遇到需求直接查表**。
+
+## 按用途分类
+
+### 触发器 (Triggers)
+
+| 节点 | 用途 | 典型 case |
+|---|---|---|
+| Manual Trigger | 手动按按钮启动（调试） | 学习阶段所有 demo |
+| Schedule Trigger | 按时间表自动跑（Cron） | 每天 9 点拉数据 |
+| Webhook | 监听 HTTP 请求 | 接收 form 提交 / 三方回调 |
+| Chat Trigger | 内置 chat UI 入口 | AI 聊天助手 |
+| Execute Sub-workflow Trigger | 被别的 workflow 调用 | 模块化复用 |
+| Error Trigger | workflow 出错时启动 | 全局错误处理 |
+
+### 应用触发器 (App Triggers)
+
+| 节点 | 用途 |
+|---|---|
+| Telegram Trigger | 监听 Telegram 消息 |
+| Slack Trigger | 监听 Slack 提及 / 消息 |
+| Gmail Trigger | 收新邮件 |
+| GitHub Trigger | PR / Issue / Release 等 |
+| Stripe Trigger | 支付事件 |
+| Shopify Trigger | 订单 / 客户事件 |
+| Notion Trigger | 数据库变更 |
+| Airtable Trigger | 表行变更 |
+| Google Sheets Trigger | 行新增 / 变更 |
+| Google Calendar Trigger | 事件创建 / 更新 |
+| Typeform Trigger | 表单提交 |
+| RSS Feed Read | 拉 RSS（轮询，非真触发） |
+
+### 数据处理 (Core)
+
+| 节点 | 用途 |
+|---|---|
+| Set / Edit Fields | 增 / 改 / 删 / 重命名字段 |
+| IF | 二分条件分支 |
+| Switch | 多分支路由 |
+| Merge | 合并两条数据流（5 种模式） |
+| Loop Over Items (SplitInBatches) | 分批迭代 / 限速 |
+| Split Out | 把数组字段拆成多个 items |
+| Aggregate | 把多 item 聚合到一个 |
+| Sort | 排序 |
+| Filter | 过滤 items |
+| Limit | 取前 N 个 |
+| Remove Duplicates | 去重 |
+| Code | 写 JS / Python 代码 |
+| Wait | 暂停 N 秒/分/天 |
+| Stop and Error | 主动报错终止 |
+
+### HTTP / 通信
+
+| 节点 | 用途 |
+|---|---|
+| HTTP Request | 万能 API 调用 |
+| Respond to Webhook | 给 Webhook 调用方回响应 |
+| Webhook | 同上（接收端） |
+| GraphQL | GraphQL 查询 |
+| MQTT | 物联网消息 |
+
+### AI / LangChain
+
+| 节点 | 用途 |
+|---|---|
+| AI Agent | 自主调用工具的智能体 |
+| OpenAI Chat Model | OpenAI GPT 系列 |
+| Anthropic Chat Model | Claude 系列 |
+| Ollama Chat Model | 本地 LLM |
+| Window Buffer Memory | 短期对话记忆 |
+| Summary Buffer Memory | 摘要式记忆 |
+| Postgres Chat Memory | 持久化记忆 |
+| OpenAI Embeddings | 文本向量化 |
+| Pinecone Vector Store | 云端向量库 |
+| Qdrant Vector Store | 自托管向量库 |
+| Vector Store Tool | 把向量库挂为 Agent Tool |
+| HTTP Request Tool | 把 HTTP 调用挂为 Agent Tool |
+| Workflow Tool | 把别的 workflow 挂为 Tool |
+| Recursive Character Text Splitter | 文档切块 |
+| Default Data Loader | 包装文档给向量库 |
+
+### 数据库
+
+| 节点 | 用途 |
+|---|---|
+| Postgres | SQL 查询 / CRUD |
+| MySQL | 同上 |
+| MongoDB | NoSQL CRUD |
+| Redis | KV 存储 |
+| Supabase | Postgres + 认证 + 存储 |
+
+### 文件 / 存储
+
+| 节点 | 用途 |
+|---|---|
+| Google Drive | 上传 / 下载 / 列文件 |
+| Dropbox / OneDrive | 同上 |
+| AWS S3 | 对象存储 |
+| FTP / SFTP | 老派文件传输 |
+| Read/Write Files from Disk | 读写本地文件（自托管） |
+| Extract from File | PDF / Excel / CSV 解析 |
+| Edit Image | 图片处理 |
+
+### 邮件 / 消息
+
+| 节点 | 用途 |
+|---|---|
+| Email Send | SMTP 发邮件 |
+| Gmail | Gmail API |
+| Slack | 发消息 / 上传文件 |
+| Discord | Discord 消息 |
+| Telegram | 发消息 / 发图 |
+| Microsoft Teams | Teams 消息 |
+| Twilio | SMS / WhatsApp |
+
+### 内容平台
+
+| 节点 | 用途 |
+|---|---|
+| Notion | 页面 / 数据库 CRUD |
+| Airtable | 表 CRUD |
+| Google Sheets | 行 CRUD |
+| Twitter / X | 发推 |
+| LinkedIn | 发帖 |
+| Medium | 发文章 |
+| YouTube | 视频元数据 / 评论 |
+| WordPress | 文章 CRUD |
+
+### 电商 / 支付 / CRM
+
+| 节点 | 用途 |
+|---|---|
+| Stripe | 支付 / 订阅 |
+| Shopify | 订单 / 产品 |
+| HubSpot | 联系人 / 交易 |
+| Salesforce | Lead / Opportunity |
+| Pipedrive | 销售 pipeline |
+
+## 按字母索引
+
+A-D | AI Agent · Airtable · Anthropic · AWS S3 · Calendar · Chat Trigger · Code · Cohere · Discord · Dropbox · DALL-E
+
+E-H | Edit Fields · Email Send · Error Trigger · Extract from File · Filter · FTP · Gmail · Google Drive · Google Sheets · GraphQL · GitHub · HTTP Request · HubSpot
+
+I-N | IF · Intercom · JSON · LinkedIn · Loop Over Items · Mailchimp · Manual Trigger · Medium · Merge · MongoDB · MQTT · MySQL · Notion
+
+O-S | Ollama · OneDrive · OpenAI · PayPal · Pinecone · Pipedrive · Postgres · Qdrant · Reddit · Redis · Respond to Webhook · RSS Feed · Salesforce · Schedule · Set · SFTP · Shopify · Slack · Sort · Split Out · Stripe · Supabase · Switch
+
+T-Z | Telegram · Teams · Twilio · Twitter · Typeform · Vector Store Tool · Wait · Webhook · WhatsApp · WordPress · YouTube
+
+<TipCallout type="tip" title="还是找不到？">
+  
+  1. 在 n8n 节点库直接搜——它支持模糊匹配，搜 "AI" 出来一堆 LangChain 节点
+  2. 没有内置节点时用 **HTTP Request** 节点 + 该应用的 API 文档
+  3. 自托管版可装[社区节点](https://www.npmjs.com/search?q=n8n-nodes-)（300+ 第三方贡献）
+  
+</TipCallout>
+
+下一节[表达式速查表](../expressions-cheatsheet/)。

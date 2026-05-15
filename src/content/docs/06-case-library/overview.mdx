@@ -13,23 +13,91 @@ import TipCallout from '../../../components/TipCallout.astro';
 学完前面 5 部分，你已经具备了"自己造轮子"的能力。这一部分给你 **24 个可以直接抄的轮子**——从最简单的"每日邮件摘要"到复杂的"AI 客服 RAG 助手"。
 
 每个案例都包含：
-- 🎯 **场景背景** —— 这玩意儿用在哪、解决什么问题
-- 🔍 **节点连线图** —— 嵌入式可视化，鼠标可平移缩放
-- 📋 **可下载 Workflow JSON** —— 一键复制粘贴到自己的 n8n
-- ⚠️ **踩坑提示** —— 哪几个参数最容易配错
-- 🎁 **扩展挑战** —— 想再进一步可以做什么
+- 🎯 **场景背景**
+- 🔍 **节点连线图**（嵌入式可视化，可平移缩放）
+- 📋 **可下载 Workflow JSON**
+- ⚠️ **踩坑提示**
+- 🎁 **扩展挑战**
 
-## 8 个主题分组
+## 全部 24 个案例索引
 
-- 🤖 **AI 助手 & 聊天机器人**（Telegram AI Bot / PDF RAG 助手 / AI 公司富化 Bot）
-- ✍️ **内容运营 & 社媒**（一键多平台分发 / YouTube SEO 自动化 / Reddit 趋势聚合）
-- 🛒 **电商与 SaaS 同步**（Shopify → Notion / Stripe 失败支付告警 / 试用到期提醒）
-- 📅 **个人生产力 / GTD**（每日邮件摘要 / 日历事件 → Notion / 习惯打卡机器人）
-- 🔄 **数据管道**（CSV → 数据库 / API 轮询路由 / 多源去重合并）
-- 📣 **营销 & CRM**（线索富化 / 邮件 Drip / Typeform → Salesforce 自动打标）
-- 🛠 **轻量 DevOps**（站点可用性监控 / GitHub 事件 → Discord / 备份巡检）
-- 🎁 **趣味项目**（天气壁纸 / AI 生日提醒 / 个人 RSS 阅读管家）
+### 🤖 AI 助手 (3)
 
-<TipCallout type="warn" title="正在编写中">
-  24 个案例正在按主题分组陆续上线。
+| 难度 | 案例 | 核心节点 |
+|---|---|---|
+| 🟢 | [Telegram AI 聊天机器人](./01-ai-assistants/telegram-ai-bot/) | Telegram × AI Agent × Memory |
+| 🟡 | [PDF RAG 智能问答](./01-ai-assistants/pdf-rag-assistant/) | Pinecone × Vector Store Tool |
+| 🟡 | [AI 公司情报富化](./01-ai-assistants/ai-company-enrichment/) | Airtable × AI JSON mode |
+
+### ✍️ 内容运营 (3)
+
+| 难度 | 案例 | 核心节点 |
+|---|---|---|
+| 🟡 | [一键多平台分发](./02-content-ops/multi-platform-poster/) | Notion × AI Rewriter × 多分支 |
+| 🟡 | [YouTube SEO 自动化](./02-content-ops/youtube-seo/) | YouTube × AI × Captions API |
+| 🟢 | [Reddit 热点每日聚合](./02-content-ops/reddit-trends/) | Schedule × Split Out × AI |
+
+### 🛒 电商 SaaS (3)
+
+| 难度 | 案例 | 核心节点 |
+|---|---|---|
+| 🟢 | [Shopify 订单 → Notion + Slack](./03-ecommerce/shopify-to-notion/) | Shopify Trigger × Notion |
+| 🟢 | [Stripe 支付失败实时告警](./03-ecommerce/stripe-failures/) | Stripe Trigger × IF × Slack |
+| 🟢 | [SaaS 试用到期提醒](./03-ecommerce/trial-expiry/) | Postgres × Email |
+
+### 📅 个人生产力 (3)
+
+| 难度 | 案例 | 核心节点 |
+|---|---|---|
+| 🟢 | [每日邮件摘要](./04-productivity/daily-email-digest/) | Gmail × AI 总结 |
+| 🟡 | [日历事件 → Notion 准备清单](./04-productivity/calendar-to-notion/) | GCal × AI × Notion |
+| 🟡 | [每日习惯打卡机器人](./04-productivity/habit-bot/) | Telegram 双触发器 × AI 解析 |
+
+### 🔄 数据管道 (3)
+
+| 难度 | 案例 | 核心节点 |
+|---|---|---|
+| 🟡 | [CSV → 数据库 数据管道](./05-data-pipeline/csv-to-database/) | GDrive × Extract × Postgres |
+| 🟡 | [API 轮询事件路由](./05-data-pipeline/api-polling-router/) | HTTP × Split × Switch |
+| 🔴 | [多源数据去重合并](./05-data-pipeline/multi-source-dedup/) | 三 Source × Merge × Code |
+
+### 📣 营销 CRM (3)
+
+| 难度 | 案例 | 核心节点 |
+|---|---|---|
+| 🟡 | [线索富化管道](./06-marketing-crm/lead-enrichment/) | Webhook × Clearbit × HubSpot |
+| 🟡 | [邮件 Drip 营销](./06-marketing-crm/drip-campaign/) | Wait × IF × 长 workflow |
+| 🟡 | [Typeform → Salesforce 自动打标](./06-marketing-crm/typeform-to-salesforce/) | Typeform × AI Tag × SF |
+
+### 🛠 轻量 DevOps (3)
+
+| 难度 | 案例 | 核心节点 |
+|---|---|---|
+| 🟢 | [站点可用性监控](./07-devops/uptime-monitor/) | Schedule × HTTP × IF |
+| 🟢 | [GitHub 事件 → Discord](./07-devops/github-to-discord/) | GitHub Trigger × Switch |
+| 🟡 | [备份巡检](./07-devops/backup-audit/) | S3 × Code × 日期判断 |
+
+### 🎁 趣味项目 (3)
+
+| 难度 | 案例 | 核心节点 |
+|---|---|---|
+| 🟡 | [AI 天气壁纸](./08-fun-projects/weather-wallpaper/) | wttr.in × DALL-E 3 × Drive |
+| 🟢 | [AI 生日提醒](./08-fun-projects/ai-birthday-reminder/) | Notion × AI × Telegram |
+| 🟡 | [个人 RSS 阅读管家](./08-fun-projects/personal-rss-butler/) | RSS × Aggregate × AI Curator |
+
+## 难度图例
+
+- 🟢 **简单**（15-20 分钟，5-7 个节点）
+- 🟡 **中等**（20-40 分钟，含 AI / 多分支 / 长链）
+- 🔴 **困难**（30 分钟+，含 Code 节点 / 复杂逻辑 / 多源整合）
+
+<TipCallout type="tip" title="怎么用这一部分">
+  
+  - **看一遍**：先扫一遍所有 24 个案例的"场景背景"，找跟你需求最像的
+  - **抄一份**：点案例页底部的"Copy Workflow JSON" → 到你的 n8n 画布右键 Paste
+  - **改一改**：节点连线已通，只需替换 Credentials 和参数
+  - **吃透扩展**：每个案例底部都有"扩展挑战"，按需深化
+  
 </TipCallout>
+
+学完案例还想要快速查阅？下一部分 [**第 7 部分 · 学习者工具箱**](../../07-reference/overview/) 提供节点速查 / 表达式速查 / 中英术语对照三套工具。
