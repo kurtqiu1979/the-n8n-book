@@ -1,0 +1,75 @@
+---
+title: AI Weather Wallpaper
+description: Daily 7am fetch weather → AI prompt → DALL-E 3 generates wallpaper → save to Google Drive
+sidebar:
+  order: 1
+  label: Case 8.1 · Weather Wallpaper
+difficulty: medium
+theme: fun-projects
+nodes:
+  - Schedule Trigger
+  - HTTP Request
+  - AI Agent
+  - OpenAI Image
+  - Google Drive
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/weather-wallpaper.json';
+
+<span class="editorial-label">Part 6 · Case 8.1 · 🎁 Fun Projects</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~20 min · **Core nodes** wttr.in × AI prompt × DALL-E 3
+
+Every morning, auto-generate a watercolor wallpaper matching today's weather, save to Google Drive (auto-syncs to your Mac/iOS). **Pure delight — n8n as a daily-ritual tool.**
+
+## 🔍 Workflow
+
+<TerminalCell filename="weather-wallpaper.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Fetch Weather:
+  URL: https://wttr.in/shanghai?format=j1
+  → free public API, no key needed
+
+AI Generate Prompt:
+  System: Generate a DALL-E prompt from weather data
+          Style: serene, poetic watercolor
+          Output prompt only, no explanation
+
+Generate Wallpaper (OpenAI Image):
+  Model:   dall-e-3
+  Prompt:  ={{ $json.output }}
+  Size:    1792x1024  (16:9 desktop)
+
+Save to Drive:
+  File name: =wallpaper-{{ $now.toFormat('yyyy-MM-dd') }}.png
+  Parent:    <Drive Wallpapers folder>`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="weather-wallpaper.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · DALL-E 3 cost">
+  
+  1792×1024 standard quality ≈ $0.08 per image. Daily = $2.4/mo. Manageable but monitor. To save: SDXL Lightning (self-host) or Flux Schnell (fal.ai, dirt cheap).
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Configure Mac launch script to auto-set the newest as desktop
+  - IF: weekend uses dreamier prompt style
+  - Multi-city: send each friend their local-weather wallpaper
+  
+</TipCallout>

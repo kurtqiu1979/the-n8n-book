@@ -1,0 +1,84 @@
+---
+title: Personal RSS Butler
+description: Daily 7am pull multiple RSS feeds → AI categorize + pick 5 highlights → Telegram Markdown digest
+sidebar:
+  order: 3
+  label: Case 8.3 · RSS Butler
+difficulty: medium
+theme: fun-projects
+nodes:
+  - Schedule Trigger
+  - Split Out
+  - RSS Feed Read
+  - Aggregate
+  - AI Agent
+  - Telegram
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/personal-rss-butler.json';
+
+<span class="editorial-label">Part 6 · Case 8.3 · 🎁 Fun Projects</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~25 min · **Core nodes** RSS × Aggregate × AI Curator
+
+The classic paradox: "dozens of RSS subscriptions, but the RSS reader never gets opened." This workflow **scans daily for you**, AI categorizes by topic + picks 5 highlights with summaries, sends a Markdown digest to Telegram — **5-minute commute read of today's must-knows**.
+
+## 🔍 Workflow
+
+<TerminalCell filename="personal-rss-butler.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={360} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Set Feed URLs:
+  feeds: "https://news.ycombinator.com/rss,
+          https://blog.n8n.io/feed,
+          https://www.anthropic.com/news/rss.xml"
+
+Split Feeds:
+  Field: feeds, Delimiter: ","
+  → one item per feed
+
+Read RSS:
+  URL: ={{ $json.feeds }}
+  Ignore Older Than: 86400 (seconds) ← only last 24h
+
+Aggregate:
+  Fields: [title, link]
+  → combine all feeds' items into one array
+
+AI Curator:
+  System: Categorize by topic (AI / Tech / Product / Other)
+          Pick top 5 with 200-word summaries each
+          Markdown output with links
+
+Send to Telegram:
+  parseMode: Markdown
+  ← so links render`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="personal-rss-butler.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · RSS feeds die over time">
+  
+  Long-running, some feeds will die or change URLs. **Continue On Fail on each Read RSS** — one dead feed shouldn't kill the digest.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Vector Store: index all articles to Pinecone, do "past-week/month trend comparisons"
+  - Multilingual: auto-translate English RSS to your local-language summaries
+  - Personalized: AI learns from your past clicks, gets better at curation
+  
+</TipCallout>

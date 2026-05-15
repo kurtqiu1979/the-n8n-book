@@ -1,0 +1,84 @@
+---
+title: 个人 RSS 阅读管家
+description: 每天 7 点拉多个 RSS → AI 按主题分类 + 选 5 篇精选 → Telegram 推送 Markdown 摘要
+sidebar:
+  order: 3
+  label: 案例 8.3 · RSS 管家
+difficulty: medium
+theme: fun-projects
+nodes:
+  - Schedule Trigger
+  - Split Out
+  - RSS Feed Read
+  - Aggregate
+  - AI Agent
+  - Telegram
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/personal-rss-butler.json';
+
+<span class="editorial-label">第 6 部分 · 案例 8.3 · 🎁 趣味项目</span>
+
+> **难度** 🟡 中等 · **耗时** ~25 分钟 · **核心节点** RSS × Aggregate × AI Curator
+
+很多人有"RSS 订阅有几十个，但 RSS 阅读器从不打开"的悖论。这个 workflow 替你**每天扫一遍**，AI 按主题分类 + 挑出 5 篇精华、写摘要，Telegram 推一份 Markdown 给你——**通勤路上 5 分钟读完今日值得看的**。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="personal-rss-butler.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={360} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Set Feed URLs:
+  feeds: "https://news.ycombinator.com/rss,
+          https://blog.n8n.io/feed,
+          https://www.anthropic.com/news/rss.xml"
+
+Split Feeds:
+  Field: feeds, Delimiter: ","
+  → 每条 feed 一个 item
+
+Read RSS:
+  URL: ={{ $json.feeds }}
+  Ignore Older Than: 86400 (秒) ← 只要最近 24 小时
+
+Aggregate:
+  Fields: [title, link]
+  → 把多条 feed 的 item 聚合成一个数组
+
+AI Curator:
+  System: 按主题分类（AI / Tech / Product / Other）
+          挑 5 篇最值得看的写 200 字摘要
+          中文 Markdown，带链接
+
+Send to Telegram:
+  parseMode: Markdown
+  ← 链接才能渲染`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="personal-rss-butler.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · RSS 源停服">
+  
+  长期跑下来肯定有几个 RSS 源会挂掉或改 URL。**每个 Read RSS 开 Continue On Fail**，一个挂了不影响其他源。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 Vector Store：所有读过的文章存 Pinecone，做"过去一周/一个月趋势对比"
+  - 多语言：英文 RSS 自动翻译成中文摘要
+  - 个性化：让 AI 学你之前点开的链接偏好，越来越懂你
+  
+</TipCallout>

@@ -1,0 +1,75 @@
+{
+  "name": "AI Weather Wallpaper",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }] } },
+      "id": "node-schedule",
+      "name": "Daily 7AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": { "url": "https://wttr.in/shanghai?format=j1", "options": {} },
+      "id": "node-weather",
+      "name": "Fetch Weather",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=今天上海天气：{{ $json.current_condition[0].weatherDesc[0].value }}，{{ $json.current_condition[0].temp_C }}°C。生成一段适合做电脑壁纸的 DALL-E 提示词：宁静、富有诗意的水彩画风格，符合当前天气和季节。只输出 prompt，不要解释。",
+        "options": {}
+      },
+      "id": "node-prompt",
+      "name": "AI Generate Prompt",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [680, 300]
+    },
+    {
+      "parameters": { "model": "gpt-4o-mini" },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "generate",
+        "prompt": "={{ $json.output }}",
+        "model": "dall-e-3",
+        "options": { "size": "1792x1024", "quality": "standard" }
+      },
+      "id": "node-dalle",
+      "name": "Generate Wallpaper",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.7,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "=wallpaper-{{ $now.toFormat('yyyy-MM-dd') }}.png",
+        "parents": { "values": [{ "id": "<DRIVE_WALLPAPERS_FOLDER>" }] },
+        "inputDataFieldName": "data"
+      },
+      "id": "node-drive",
+      "name": "Save to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1160, 300]
+    }
+  ],
+  "connections": {
+    "Daily 7AM": { "main": [[{ "node": "Fetch Weather", "type": "main", "index": 0 }]] },
+    "Fetch Weather": { "main": [[{ "node": "AI Generate Prompt", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "AI Generate Prompt", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Generate Prompt": { "main": [[{ "node": "Generate Wallpaper", "type": "main", "index": 0 }]] },
+    "Generate Wallpaper": { "main": [[{ "node": "Save to Drive", "type": "main", "index": 0 }]] }
+  }
+}

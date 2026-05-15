@@ -1,0 +1,79 @@
+---
+title: AI 生日提醒
+description: 每天 9 点查 Notion 朋友库 → 今天有生日 → AI 根据 Notes 字段写个性化祝福 → Telegram 推送给你
+sidebar:
+  order: 2
+  label: 案例 8.2 · 生日提醒
+difficulty: easy
+theme: fun-projects
+nodes:
+  - Schedule Trigger
+  - Notion
+  - IF
+  - AI Agent
+  - Telegram
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/ai-birthday-reminder.json';
+
+<span class="editorial-label">第 6 部分 · 案例 8.2 · 🎁 趣味项目</span>
+
+> **难度** 🟢 简单 · **耗时** ~20 分钟 · **核心节点** Notion × IF × AI
+
+朋友太多生日总记不住？这个 workflow 维护一份 Notion "Friends" 数据库（Name / Birthday / Notes），每天 9 点扫一遍，今天有谁过生日就用 AI 根据 Notes（"喜欢徒步、刚换工作"）**写一段个性化祝福**，Telegram 推给你——你只需复制粘贴发给对方。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="ai-birthday-reminder.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Notion DB schema (你先建):
+  Name (title)
+  Birthday (date)
+  Notes (rich text) - 关于对方的记录
+
+List Friends:
+  Database: <你的 Friends DB>
+  Return All: true
+
+Is Birthday Today? (IF):
+  ={{ DateTime.fromISO($json.properties.Birthday.date.start).toFormat('MM-dd') }}
+    ==
+  ={{ $now.toFormat('MM-dd') }}
+
+AI Compose Wish:
+  Prompt: 给 {{ name }} 写生日祝福，根据笔记: {{ notes }}
+  System: 温暖、个性化、不要套话。100 字以内。
+
+Telegram Notify Me:
+  Chat ID: <你的 Telegram>
+  Text: 🎂 今天是 X 的生日 + AI 写的祝福`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="ai-birthday-reminder.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · Notion 日期解析">
+  
+  Notion date 字段的结构是 `{ start: "2026-05-15", end: null }`。一定取 `.date.start` 子字段，且记得 `DateTime.fromISO(...)` 解析。直接做字符串比较容易踩格式坑。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 提前 3 天预警：让你有时间准备礼物
+  - 自动调 OpenAI Image API 生成生日卡片配图
+  - 闭环：你回复 "已发送" → workflow 更新 Notion 记录"今年已祝福"
+  
+</TipCallout>

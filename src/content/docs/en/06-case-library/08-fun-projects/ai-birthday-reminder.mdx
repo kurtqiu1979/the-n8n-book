@@ -1,0 +1,79 @@
+---
+title: AI Birthday Reminder
+description: Daily 9am scan Notion friends DB → today's birthdays → AI composes personalized wish → Telegram push
+sidebar:
+  order: 2
+  label: Case 8.2 · Birthday Reminder
+difficulty: easy
+theme: fun-projects
+nodes:
+  - Schedule Trigger
+  - Notion
+  - IF
+  - AI Agent
+  - Telegram
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/ai-birthday-reminder.json';
+
+<span class="editorial-label">Part 6 · Case 8.2 · 🎁 Fun Projects</span>
+
+> **Difficulty** 🟢 Easy · **Time** ~20 min · **Core nodes** Notion × IF × AI
+
+Too many friends, can never remember birthdays? Maintain a Notion "Friends" DB (Name / Birthday / Notes), this workflow scans daily, when someone's birthday is today, AI uses the Notes field ("loves hiking, just changed jobs") to **compose a personalized wish**, pushed to your Telegram — just copy/paste to send.
+
+## 🔍 Workflow
+
+<TerminalCell filename="ai-birthday-reminder.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Notion DB schema (create first):
+  Name (title)
+  Birthday (date)
+  Notes (rich text) - what you know about them
+
+List Friends:
+  Database: <your Friends DB>
+  Return All: true
+
+Is Birthday Today? (IF):
+  ={{ DateTime.fromISO($json.properties.Birthday.date.start).toFormat('MM-dd') }}
+    ==
+  ={{ $now.toFormat('MM-dd') }}
+
+AI Compose Wish:
+  Prompt: Write a birthday wish for {{ name }}, based on notes: {{ notes }}
+  System: Warm, personal, no clichés. Under 100 words.
+
+Telegram Notify Me:
+  Chat ID: <your Telegram>
+  Text: 🎂 Today is X's birthday + AI-composed wish`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="ai-birthday-reminder.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Notion date parsing">
+  
+  Notion's date field is `{ start: "2026-05-15", end: null }`. Always access `.date.start`, parse with `DateTime.fromISO(...)`. Don't string-compare raw — format gotchas await.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Pre-alert 3 days ahead — time to buy gifts
+  - Auto-generate birthday card image via OpenAI Image API
+  - Close the loop: you reply "sent" → workflow updates Notion record "wished this year"
+  
+</TipCallout>

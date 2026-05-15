@@ -1,0 +1,94 @@
+{
+  "name": "Personal RSS Butler",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 7 * * *" }] } },
+      "id": "node-schedule",
+      "name": "Daily 7AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "feeds", "value": "https://news.ycombinator.com/rss,https://blog.n8n.io/feed,https://www.anthropic.com/news/rss.xml" }
+          ]
+        }
+      },
+      "id": "node-set",
+      "name": "Set Feed URLs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 400]
+    },
+    {
+      "parameters": { "fieldToSplitOut": "feeds", "options": { "delimiter": "," } },
+      "id": "node-split",
+      "name": "Split Feeds",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [600, 400]
+    },
+    {
+      "parameters": { "url": "={{ $json.feeds }}", "options": { "ignoreOlderThan": 86400 } },
+      "id": "node-rss",
+      "name": "Read RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [800, 400]
+    },
+    {
+      "parameters": { "fieldToAggregate": { "fieldToAggregate": [{ "fieldToAggregate": "title" }, { "fieldToAggregate": "link" }] } },
+      "id": "node-agg",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json) }}",
+        "options": {
+          "systemMessage": "把这批 RSS 文章按主题分类，并挑出 5 篇最值得看的写一段 200 字摘要。分类：AI / Tech / Product / Other。中文输出，Markdown 格式带链接。"
+        }
+      },
+      "id": "node-ai",
+      "name": "AI Curator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1220, 400]
+    },
+    {
+      "parameters": { "model": "gpt-4o-mini" },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1220, 600]
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_ID>",
+        "text": "=📰 *今日 RSS 精选*\\n\\n{{ $json.output }}",
+        "additionalFields": { "parseMode": "Markdown" }
+      },
+      "id": "node-tg",
+      "name": "Send to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1460, 400]
+    }
+  ],
+  "connections": {
+    "Daily 7AM": { "main": [[{ "node": "Set Feed URLs", "type": "main", "index": 0 }]] },
+    "Set Feed URLs": { "main": [[{ "node": "Split Feeds", "type": "main", "index": 0 }]] },
+    "Split Feeds": { "main": [[{ "node": "Read RSS", "type": "main", "index": 0 }]] },
+    "Read RSS": { "main": [[{ "node": "Aggregate", "type": "main", "index": 0 }]] },
+    "Aggregate": { "main": [[{ "node": "AI Curator", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "AI Curator", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Curator": { "main": [[{ "node": "Send to Telegram", "type": "main", "index": 0 }]] }
+  }
+}

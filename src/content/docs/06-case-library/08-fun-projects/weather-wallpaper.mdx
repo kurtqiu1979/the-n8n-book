@@ -1,0 +1,75 @@
+---
+title: AI 天气壁纸
+description: 每天早 7 点拉天气 → AI 写 prompt → DALL-E 3 生成壁纸 → 存 Google Drive
+sidebar:
+  order: 1
+  label: 案例 8.1 · 天气壁纸
+difficulty: medium
+theme: fun-projects
+nodes:
+  - Schedule Trigger
+  - HTTP Request
+  - AI Agent
+  - OpenAI Image
+  - Google Drive
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/weather-wallpaper.json';
+
+<span class="editorial-label">第 6 部分 · 案例 8.1 · 🎁 趣味项目</span>
+
+> **难度** 🟡 中等 · **耗时** ~20 分钟 · **核心节点** wttr.in × AI prompt × DALL-E 3
+
+每天早晨自动生成一张和今天天气匹配的水彩画壁纸，存到 Google Drive 自动同步给你 Mac/iOS。**纯娱乐 + 让 n8n 变成"日常仪式感"工具**。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="weather-wallpaper.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Fetch Weather:
+  URL: https://wttr.in/shanghai?format=j1
+  → 公开免费 API，无需 key
+
+AI Generate Prompt:
+  System: 根据天气数据生成 DALL-E 提示词
+          风格：宁静、富有诗意的水彩画
+          只输出 prompt 不要解释
+
+Generate Wallpaper (OpenAI Image):
+  Model:   dall-e-3
+  Prompt:  ={{ $json.output }}
+  Size:    1792x1024  (16:9 桌面壁纸)
+
+Save to Drive:
+  File name: =wallpaper-{{ $now.toFormat('yyyy-MM-dd') }}.png
+  Parent:    <Drive 桌面壁纸文件夹>`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="weather-wallpaper.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · DALL-E 3 调用费">
+  
+  每张 1792×1024 standard quality 约 $0.08。每天一张 = 月 $2.4。可承受但记得监控。要省钱可以用 SDXL Lightning（自托管）或 Flux Schnell（fal.ai 极便宜）。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 配 Mac 启动 script 自动把最新壁纸设为桌面
+  - 加 IF：周末用更梦幻的风格 prompt
+  - 多城市：你旅居各地的朋友各自的天气壁纸送到对应 chat
+  
+</TipCallout>

@@ -1,0 +1,83 @@
+{
+  "name": "AI Birthday Reminder",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] } },
+      "id": "node-schedule",
+      "name": "Daily 9AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "<NOTION_FRIENDS_DB>",
+        "returnAll": true
+      },
+      "id": "node-notion-list",
+      "name": "List Friends",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            { "leftValue": "={{ DateTime.fromISO($json.properties.Birthday.date.start).toFormat('MM-dd') }}", "rightValue": "={{ $now.toFormat('MM-dd') }}", "operator": { "type": "string", "operation": "equals" } }
+          ]
+        }
+      },
+      "id": "node-filter",
+      "name": "Is Birthday Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=给 {{ $json.properties.Name.title[0].plain_text }} 写一段生日祝福。背景：{{ $json.properties.Notes.rich_text[0]?.plain_text || '老朋友' }}。要温暖、个性化、不要套话。100 字以内。",
+        "options": {}
+      },
+      "id": "node-ai-msg",
+      "name": "AI Compose Wish",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [900, 220]
+    },
+    {
+      "parameters": { "model": "gpt-4o-mini" },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_ID>",
+        "text": "=🎂 *今天是 {{ $('List Friends').item.json.properties.Name.title[0].plain_text }} 的生日*\\n\\n建议消息：\\n{{ $json.output }}\\n\\n（复制后手动发给他/她）",
+        "additionalFields": { "parseMode": "Markdown" }
+      },
+      "id": "node-tg",
+      "name": "Telegram Notify Me",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1140, 220]
+    }
+  ],
+  "connections": {
+    "Daily 9AM": { "main": [[{ "node": "List Friends", "type": "main", "index": 0 }]] },
+    "List Friends": { "main": [[{ "node": "Is Birthday Today?", "type": "main", "index": 0 }]] },
+    "Is Birthday Today?": {
+      "main": [
+        [{ "node": "AI Compose Wish", "type": "main", "index": 0 }]
+      ]
+    },
+    "OpenAI": { "ai_languageModel": [[{ "node": "AI Compose Wish", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Compose Wish": { "main": [[{ "node": "Telegram Notify Me", "type": "main", "index": 0 }]] }
+  }
+}
