@@ -1,0 +1,86 @@
+---
+title: Backup Audit
+description: Daily 9am scan S3 → alert if today's backup missing → extra Friday "weekly report"
+sidebar:
+  order: 3
+  label: Case 7.3 · Backup Audit
+difficulty: medium
+theme: devops
+nodes:
+  - Schedule Trigger
+  - AWS S3
+  - Code
+  - IF
+  - Slack
+  - Email Send
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/backup-audit.json';
+
+<span class="editorial-label">Part 6 · Case 7.3 · 🛠 DevOps Lite</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~25 min · **Core nodes** S3 List × Code logic × Date check
+
+"Backups are running" — until the day you lose data and discover backups have been broken for 6 months. This workflow checks daily for today's backup file in S3; missing = alert. Fridays send a weekly summary confirming this week's backups are healthy.
+
+## 🔍 Workflow
+
+<TerminalCell filename="backup-audit.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={400} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Daily 9AM Check (Schedule):
+  Cron: 0 9 * * *
+
+List S3 Backups:
+  Operation: List
+  Bucket:    company-backups
+  Prefix:    daily/
+
+Check Today (Code):
+  const today = new Date().toISOString().slice(0,10);
+  const found = $input.all().some(i =>
+    (i.json.key || '').includes(today)
+  );
+  return [{ json: { found, today, totalFiles: $input.all().length } }];
+
+Backup Missing? (IF):
+  found == false → Slack Alert
+  found == true  → Is Friday? → weekly report
+
+Is Friday? (IF):
+  $now.weekday == 5  ← Luxon: 1=Mon, 5=Fri
+
+Friday Report:
+  Email summary of the week's backup health`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="backup-audit.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · 'Backup exists' ≠ 'Backup works'">
+  
+  This workflow only checks "today's filename exists," not file integrity. Production should add:
+  - File size check (anomalously small = possibly empty backup)
+  - Sample download + MD5 verification
+  - Periodic actual "restore drills"
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Monitor multiple backup buckets (database / files / user data)
+  - Vector Store: index historical backup metadata, AI detects "backup size dropped 50%" anomalies
+  - Monthly restore drill: auto-restore one backup in a sandbox env to verify usability
+  
+</TipCallout>

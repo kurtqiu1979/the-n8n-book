@@ -1,0 +1,70 @@
+---
+title: GitHub 事件 → Discord 通知
+description: PR / Issue / Release 事件 → Switch 按类型路由到不同 Discord 频道
+sidebar:
+  order: 2
+  label: 案例 7.2 · GitHub → Discord
+difficulty: easy
+theme: devops
+nodes:
+  - GitHub Trigger
+  - Switch
+  - Discord
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/github-to-discord.json';
+
+<span class="editorial-label">第 6 部分 · 案例 7.2 · 🛠 轻量 DevOps</span>
+
+> **难度** 🟢 简单 · **耗时** ~15 分钟 · **核心节点** GitHub Trigger × Switch × Discord
+
+开源项目或小团队 Discord 服务器最常见的诉求——让 GitHub 的关键事件自动推到对应频道。PR 到 #dev-prs，Issue 到 #dev-issues，Release 到 #announcements。**3 个分支、3 类讯息一目了然**。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="github-to-discord.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={420} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`GitHub Trigger:
+  Events: [pull_request, issues, release]
+  Owner / Repo: your-org / your-repo
+  → n8n 自动注册 GitHub Webhook
+
+Route Event (Switch):
+  Output 0: action = "opened"      (PR)
+  Output 1: action = "opened"      (Issue)
+  Output 2: action = "published"   (Release)
+
+3 个 Discord 节点：
+  Discord #dev-prs
+  Discord #dev-issues
+  Discord #announcements`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="github-to-discord.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 不同 event 的 payload 结构不一样">
+  
+  `pull_request` 事件用 `$json.pull_request.title`，`issues` 用 `$json.issue.title`，`release` 用 `$json.release.tag_name`。**节点 webhook payload 结构与事件类型强相关**——参考 GitHub Webhook 文档。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 IF：只在 PR 包含 "[breaking]" 时 @通知整个频道
+  - 用 AI 节点把长 PR 描述自动总结成 3 句话
+  - 监听多个 repo：动态用 SplitOut + 一个 Set 节点配置 repo 列表
+  
+</TipCallout>

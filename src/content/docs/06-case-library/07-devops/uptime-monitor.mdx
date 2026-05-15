@@ -1,0 +1,77 @@
+---
+title: 站点可用性监控
+description: 每 5 分钟 ping URL → 失败立刻 Discord 告警 → 所有结果落库做 SLA 统计
+sidebar:
+  order: 1
+  label: 案例 7.1 · 站点可用性
+difficulty: easy
+theme: devops
+nodes:
+  - Schedule Trigger
+  - HTTP Request
+  - IF
+  - Discord
+  - Airtable
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/uptime-monitor.json';
+
+<span class="editorial-label">第 6 部分 · 案例 7.1 · 🛠 轻量 DevOps</span>
+
+> **难度** 🟢 简单 · **耗时** ~15 分钟 · **核心节点** Schedule × HTTP × IF × Discord
+
+UptimeRobot 之类的服务每月几十刀。你的小项目其实只要一个 5 节点 n8n workflow 就能搞定——每 5 分钟 ping 一次健康检查端点，挂了立刻 Discord 通知，所有结果落 Airtable 做 SLA 统计。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="uptime-monitor.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Every 5 min (Schedule):
+  Minutes: 5
+
+Health Check (HTTP):
+  URL: https://your-site.com/health
+  Options:
+    Timeout: 10000
+    Full Response: true   ← 才能拿到 statusCode
+    Ignore Response Code: true   ← 5xx 也不抛错
+
+Is Down? (IF):
+  $json.statusCode != 200
+
+Discord Alert (True 分支):
+  Channel: #ops-alerts
+  Text: 🔴 Site DOWN · status {{ statusCode }}
+
+Log to Airtable (双分支都走):
+  url, status, duration_ms, checked_at`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="uptime-monitor.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 告警风暴">
+  
+  站点挂 1 小时 = 12 次连续告警，瞬间淹没频道。**加防抖**：用 Static Data 记 last_alert_time，连续告警的间隔 < 30 分钟就跳过。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 监控多个 URL：Set 数组 → SplitInBatches → 并行检查
+  - 加 IF：响应慢（> 3s）也告警，不只 down
+  - SLA 看板：从 Airtable 数据做月度图表
+  
+</TipCallout>

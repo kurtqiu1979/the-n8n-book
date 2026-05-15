@@ -1,0 +1,77 @@
+---
+title: Site Uptime Monitor
+description: Ping a URL every 5 min → Discord alert on failure → log all results for SLA stats
+sidebar:
+  order: 1
+  label: Case 7.1 · Uptime Monitor
+difficulty: easy
+theme: devops
+nodes:
+  - Schedule Trigger
+  - HTTP Request
+  - IF
+  - Discord
+  - Airtable
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/uptime-monitor.json';
+
+<span class="editorial-label">Part 6 · Case 7.1 · 🛠 DevOps Lite</span>
+
+> **Difficulty** 🟢 Easy · **Time** ~15 min · **Core nodes** Schedule × HTTP × IF × Discord
+
+UptimeRobot-class services cost $20+/mo. For a side project, a 5-node n8n workflow does the same — ping a health endpoint every 5 min, alert Discord on failure, log everything to Airtable for SLA tracking.
+
+## 🔍 Workflow
+
+<TerminalCell filename="uptime-monitor.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Every 5 min (Schedule):
+  Minutes: 5
+
+Health Check (HTTP):
+  URL: https://your-site.com/health
+  Options:
+    Timeout: 10000
+    Full Response: true   ← exposes statusCode
+    Ignore Response Code: true   ← 5xx doesn't throw
+
+Is Down? (IF):
+  $json.statusCode != 200
+
+Discord Alert (True branch):
+  Channel: #ops-alerts
+  Text: 🔴 Site DOWN · status {{ statusCode }}
+
+Log to Airtable (both branches):
+  url, status, duration_ms, checked_at`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="uptime-monitor.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Alert storm">
+  
+  Site down for 1 hour = 12 consecutive alerts, flooding the channel. **Add debouncing**: store `last_alert_time` in Static Data, skip if last alert < 30 min ago.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Monitor multiple URLs: Set array → SplitInBatches → parallel checks
+  - Add IF for slow response (> 3s), not just down
+  - SLA dashboard: monthly charts from Airtable data
+  
+</TipCallout>

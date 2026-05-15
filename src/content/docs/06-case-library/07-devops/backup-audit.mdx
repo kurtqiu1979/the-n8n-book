@@ -1,0 +1,86 @@
+---
+title: 备份巡检
+description: 每天 9 点扫 S3 → 缺今日备份立刻告警 → 周五额外发"周报"邮件
+sidebar:
+  order: 3
+  label: 案例 7.3 · 备份巡检
+difficulty: medium
+theme: devops
+nodes:
+  - Schedule Trigger
+  - AWS S3
+  - Code
+  - IF
+  - Slack
+  - Email Send
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/backup-audit.json';
+
+<span class="editorial-label">第 6 部分 · 案例 7.3 · 🛠 轻量 DevOps</span>
+
+> **难度** 🟡 中等 · **耗时** ~25 分钟 · **核心节点** S3 List × Code 逻辑 × 日期判断
+
+"备份一直在跑"——直到有天数据丢了你才发现备份已经挂了半年。这个 workflow 每天 9 点检查 S3 桶里是否有今日备份文件，没有立刻告警；周五额外发周报确认本周备份健康。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="backup-audit.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={400} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Daily 9AM Check (Schedule):
+  Cron: 0 9 * * *
+
+List S3 Backups:
+  Operation: List
+  Bucket:    company-backups
+  Prefix:    daily/
+
+Check Today (Code 节点):
+  const today = new Date().toISOString().slice(0,10);
+  const found = $input.all().some(i =>
+    (i.json.key || '').includes(today)
+  );
+  return [{ json: { found, today, totalFiles: $input.all().length } }];
+
+Backup Missing? (IF):
+  found == false → Slack Alert
+  found == true  → Is Friday? → 周报
+
+Is Friday? (IF):
+  $now.weekday == 5  ← Luxon: 1=Mon, 5=Fri
+
+Friday Report:
+  邮件总结本周备份状态`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="backup-audit.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title='坑 · "备份存在 ≠ 备份有效"'>
+  
+  这个 workflow 只检查"今日文件名是否存在"，**不验证文件内容**。真实生产建议加：
+  - 文件大小检查（异常小 = 可能空备份）
+  - 抽样下载并 MD5 校验
+  - 定期实际"恢复演练"
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 监控多个备份桶（数据库 / 文件 / 用户数据）
+  - 加 Vector Store：把历史备份 metadata 存起来，AI 发现"备份大小突降 50%"等异常
+  - 备份恢复演练：每月自动用一个备份在沙箱环境恢复，验证可用
+  
+</TipCallout>

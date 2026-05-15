@@ -1,0 +1,95 @@
+{
+  "name": "Daily Backup Audit",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] } },
+      "id": "node-daily",
+      "name": "Daily 9AM Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": { "operation": "list", "bucketName": "company-backups", "options": { "prefix": "daily/" } },
+      "id": "node-s3-list",
+      "name": "List S3 Backups",
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 2,
+      "position": [400, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 查找今天的备份文件\nconst today = new Date().toISOString().slice(0,10);\nconst found = $input.all().some(i => (i.json.key || '').includes(today));\nreturn [{ json: { found, today, totalFiles: $input.all().length } }];"
+      },
+      "id": "node-check",
+      "name": "Check Today",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [620, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{ "leftValue": "={{ $json.found }}", "rightValue": false, "operator": { "type": "boolean", "operation": "equals" } }]
+        }
+      },
+      "id": "node-if",
+      "name": "Backup Missing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [840, 400]
+    },
+    {
+      "parameters": {
+        "channel": "#ops-critical",
+        "text": "=🚨 *Backup MISSING for {{ $json.today }}*\\nLast backup time: check S3 console immediately"
+      },
+      "id": "node-alert",
+      "name": "Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [1060, 280]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{ "leftValue": "={{ $now.weekday }}", "rightValue": 5, "operator": { "type": "number", "operation": "equals" } }]
+        }
+      },
+      "id": "node-friday",
+      "name": "Is Friday?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1060, 520]
+    },
+    {
+      "parameters": {
+        "fromEmail": "ops@example.com",
+        "toEmail": "team@example.com",
+        "subject": "Weekly Backup Audit",
+        "html": "=<p>All daily backups present this week. Total files: {{ $('Check Today').item.json.totalFiles }}.</p>"
+      },
+      "id": "node-weekly",
+      "name": "Friday Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1280, 520]
+    }
+  ],
+  "connections": {
+    "Daily 9AM Check": { "main": [[{ "node": "List S3 Backups", "type": "main", "index": 0 }]] },
+    "List S3 Backups": { "main": [[{ "node": "Check Today", "type": "main", "index": 0 }]] },
+    "Check Today": { "main": [[{ "node": "Backup Missing?", "type": "main", "index": 0 }]] },
+    "Backup Missing?": {
+      "main": [
+        [{ "node": "Slack Alert", "type": "main", "index": 0 }],
+        [{ "node": "Is Friday?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Friday?": {
+      "main": [
+        [{ "node": "Friday Report", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}

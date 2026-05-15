@@ -1,0 +1,70 @@
+---
+title: GitHub Events → Discord
+description: PR / Issue / Release events → Switch routes to different Discord channels
+sidebar:
+  order: 2
+  label: Case 7.2 · GitHub → Discord
+difficulty: easy
+theme: devops
+nodes:
+  - GitHub Trigger
+  - Switch
+  - Discord
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/github-to-discord.json';
+
+<span class="editorial-label">Part 6 · Case 7.2 · 🛠 DevOps Lite</span>
+
+> **Difficulty** 🟢 Easy · **Time** ~15 min · **Core nodes** GitHub Trigger × Switch × Discord
+
+Classic open-source / small team Discord pattern — push GitHub key events to dedicated channels. PRs to #dev-prs, issues to #dev-issues, releases to #announcements. **3 branches, 3 message types, all clear at a glance.**
+
+## 🔍 Workflow
+
+<TerminalCell filename="github-to-discord.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={420} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`GitHub Trigger:
+  Events: [pull_request, issues, release]
+  Owner / Repo: your-org / your-repo
+  → n8n auto-registers a GitHub Webhook
+
+Route Event (Switch):
+  Output 0: action = "opened"      (PR)
+  Output 1: action = "opened"      (Issue)
+  Output 2: action = "published"   (Release)
+
+Three Discord nodes:
+  Discord #dev-prs
+  Discord #dev-issues
+  Discord #announcements`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="github-to-discord.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Different events have different payload shapes">
+  
+  `pull_request` events use `$json.pull_request.title`, `issues` uses `$json.issue.title`, `release` uses `$json.release.tag_name`. **Webhook payload structure is event-specific** — refer to GitHub Webhook docs.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - IF: only @-mention the whole channel when PR contains "[breaking]"
+  - AI-summarize long PR descriptions into 3 sentences
+  - Multi-repo: SplitOut + Set node configures repo list
+  
+</TipCallout>

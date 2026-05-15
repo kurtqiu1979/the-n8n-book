@@ -1,0 +1,76 @@
+{
+  "name": "GitHub Events to Discord",
+  "nodes": [
+    {
+      "parameters": {
+        "events": ["pull_request", "issues", "release"],
+        "owner": "your-org",
+        "repository": "your-repo"
+      },
+      "id": "node-gh",
+      "name": "GitHub Trigger",
+      "type": "n8n-nodes-base.githubTrigger",
+      "typeVersion": 1,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "outputKey": "pull_request", "conditions": { "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "opened" }] } },
+            { "outputKey": "issue", "conditions": { "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "opened" }] } },
+            { "outputKey": "release", "conditions": { "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "published" }] } }
+          ]
+        }
+      },
+      "id": "node-switch",
+      "name": "Route Event",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "channel": "#dev-prs",
+        "text": "=🔀 *New PR* #{{ $json.pull_request.number }}: {{ $json.pull_request.title }}\\nby @{{ $json.pull_request.user.login }}\\n<{{ $json.pull_request.html_url }}>"
+      },
+      "id": "node-discord-pr",
+      "name": "Discord #dev-prs",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [740, 220]
+    },
+    {
+      "parameters": {
+        "channel": "#dev-issues",
+        "text": "=🐛 *New Issue* #{{ $json.issue.number }}: {{ $json.issue.title }}\\nby @{{ $json.issue.user.login }}\\n<{{ $json.issue.html_url }}>"
+      },
+      "id": "node-discord-issue",
+      "name": "Discord #dev-issues",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [740, 400]
+    },
+    {
+      "parameters": {
+        "channel": "#announcements",
+        "text": "=🚀 *New Release* {{ $json.release.tag_name }}\\n{{ $json.release.name }}\\n```{{ ($json.release.body || '').slice(0, 500) }}```\\n<{{ $json.release.html_url }}>"
+      },
+      "id": "node-discord-release",
+      "name": "Discord #announcements",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [740, 580]
+    }
+  ],
+  "connections": {
+    "GitHub Trigger": { "main": [[{ "node": "Route Event", "type": "main", "index": 0 }]] },
+    "Route Event": {
+      "main": [
+        [{ "node": "Discord #dev-prs", "type": "main", "index": 0 }],
+        [{ "node": "Discord #dev-issues", "type": "main", "index": 0 }],
+        [{ "node": "Discord #announcements", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}
