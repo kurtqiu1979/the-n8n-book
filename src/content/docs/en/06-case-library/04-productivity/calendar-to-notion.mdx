@@ -1,0 +1,74 @@
+---
+title: Calendar Events → Notion Prep Pages
+description: Google Calendar new event → AI generates agenda/prep notes/questions → auto-creates Notion page
+sidebar:
+  order: 2
+  label: Case 4.2 · Calendar → Notion
+difficulty: medium
+theme: productivity
+nodes:
+  - Google Calendar Trigger
+  - AI Agent
+  - Notion
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/calendar-to-notion.json';
+
+<span class="editorial-label">Part 6 · Case 4.2 · 📅 Productivity</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~25 min · **Core nodes** GCal Trigger × AI × Notion
+
+Scrambling to draft an agenda right before a meeting? Let AI do it. Whenever Google Calendar has a new event, auto-use GPT against title+description to draft "agenda / prep notes / questions" — saves to a Notion page for you to refine.
+
+## 🔍 Workflow
+
+<TerminalCell filename="calendar-to-notion.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={300} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`GCal Trigger:
+  Trigger On: eventCreated
+  Calendar:   primary
+
+AI Prep Notes:
+  System: From the event title and description, generate JSON:
+          { "agenda": ["..."], "prep_notes": ["..."], "questions": ["..."] }
+  Response Format: json_object
+
+Create Notion Page:
+  Database: <Notion Meetings DB>
+  Properties:
+    Title (title):    ={{ event.summary }}
+    Date (date):      ={{ event.start.dateTime }}
+    Attendees (multi-select): event.attendees emails
+  Blocks:
+    h2: Agenda          → bulleted list from $json.agenda
+    h2: Prep Notes      → bulleted list from $json.prep_notes`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="calendar-to-notion.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Private events also get analyzed">
+  
+  GCal Trigger fires on every new event, including private ones like "gym." AI generates meaningless agendas. **Add an IF filter:** only process events with attendees > 1 (multi-person meetings).
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Post-meeting trigger: fetch recording → AI summarize → append to same Notion page
+  - Merge with history: if a weekly meeting, AI generates "compare to last week's resolutions"
+  - Slack reminder: push prep notes 15 min before meeting
+  
+</TipCallout>

@@ -1,0 +1,67 @@
+{
+  "name": "Calendar to Notion",
+  "nodes": [
+    {
+      "parameters": { "triggerOn": "eventCreated", "calendar": { "__rl": true, "value": "primary", "mode": "list" } },
+      "id": "node-gcal",
+      "name": "GCal - New Event",
+      "type": "n8n-nodes-base.googleCalendarTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.summary + '\\n' + ($json.description || '') }}",
+        "options": {
+          "systemMessage": "根据日历事件标题和描述，生成会议准备清单 JSON：\n{ \"agenda\": [\"...\", ...], \"prep_notes\": [\"...\", ...], \"questions\": [\"...\", ...] }\n中文。只回 JSON。"
+        }
+      },
+      "id": "node-ai",
+      "name": "AI Prep Notes",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [480, 300]
+    },
+    {
+      "parameters": { "model": "gpt-4o-mini", "options": { "responseFormat": "json_object" } },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [480, 500]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": "<NOTION_MEETINGS_DB>",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Title|title", "title": "={{ $('GCal - New Event').item.json.summary }}" },
+            { "key": "Date|date", "date": "={{ $('GCal - New Event').item.json.start.dateTime }}" },
+            { "key": "Attendees|multi_select", "multiSelectValue": "={{ ($('GCal - New Event').item.json.attendees || []).map(a => a.email).join(',') }}" }
+          ]
+        },
+        "blockUi": {
+          "blockValues": [
+            { "type": "heading_2", "textContent": "Agenda" },
+            { "type": "bulleted_list_item", "textContent": "={{ $json.agenda.join('\\n') }}" },
+            { "type": "heading_2", "textContent": "Prep Notes" },
+            { "type": "bulleted_list_item", "textContent": "={{ $json.prep_notes.join('\\n') }}" }
+          ]
+        }
+      },
+      "id": "node-notion",
+      "name": "Create Notion Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [780, 300]
+    }
+  ],
+  "connections": {
+    "GCal - New Event": { "main": [[{ "node": "AI Prep Notes", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "AI Prep Notes", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Prep Notes": { "main": [[{ "node": "Create Notion Page", "type": "main", "index": 0 }]] }
+  }
+}

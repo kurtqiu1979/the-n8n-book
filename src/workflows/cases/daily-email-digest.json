@@ -1,0 +1,76 @@
+{
+  "name": "Daily Email Digest",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }] } },
+      "id": "node-schedule",
+      "name": "Daily 8AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "filters": { "labelIds": ["INBOX"], "q": "is:unread newer_than:1d" },
+        "limit": 50
+      },
+      "id": "node-gmail",
+      "name": "Fetch Unread Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "fieldToAggregate": { "fieldToAggregate": [{ "fieldToAggregate": "snippet" }] }
+      },
+      "id": "node-agg",
+      "name": "Aggregate Snippets",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.snippet.join('\\n---\\n') }}",
+        "options": {
+          "systemMessage": "你是邮件助理。把这些邮件总结成 3 类：\n- 🔥 重要待办（最多 5 条）\n- 📰 信息更新（一句话每个）\n- 🗑 可忽略\n用中文，简洁有信息密度。"
+        }
+      },
+      "id": "node-ai",
+      "name": "AI Digest",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [900, 300]
+    },
+    {
+      "parameters": { "model": "gpt-4o-mini" },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [900, 500]
+    },
+    {
+      "parameters": {
+        "channel": "@you",
+        "text": "=📧 *今日邮件摘要*\n\n{{ $json.output }}"
+      },
+      "id": "node-slack",
+      "name": "DM to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [1140, 300]
+    }
+  ],
+  "connections": {
+    "Daily 8AM": { "main": [[{ "node": "Fetch Unread Emails", "type": "main", "index": 0 }]] },
+    "Fetch Unread Emails": { "main": [[{ "node": "Aggregate Snippets", "type": "main", "index": 0 }]] },
+    "Aggregate Snippets": { "main": [[{ "node": "AI Digest", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "AI Digest", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Digest": { "main": [[{ "node": "DM to Slack", "type": "main", "index": 0 }]] }
+  }
+}

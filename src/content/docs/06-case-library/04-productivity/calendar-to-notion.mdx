@@ -1,0 +1,74 @@
+---
+title: 日历事件 → Notion 准备清单
+description: Google Calendar 新事件 → AI 生成 agenda/prep notes/questions → 自动建 Notion 页
+sidebar:
+  order: 2
+  label: 案例 4.2 · 日历 → Notion
+difficulty: medium
+theme: productivity
+nodes:
+  - Google Calendar Trigger
+  - AI Agent
+  - Notion
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/calendar-to-notion.json';
+
+<span class="editorial-label">第 6 部分 · 案例 4.2 · 📅 个人生产力</span>
+
+> **难度** 🟡 中等 · **耗时** ~25 分钟 · **核心节点** GCal Trigger × AI × Notion
+
+每次开会前都要慌忙列议程？让 AI 替你想。一旦 Google Calendar 有新事件，自动用 GPT 根据标题+描述生成"议程草稿 / 准备笔记 / 待提问"，建一份 Notion 页等你完善。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="calendar-to-notion.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={300} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`GCal Trigger:
+  Trigger On: eventCreated
+  Calendar:   primary
+
+AI Prep Notes:
+  System: 根据日历事件标题和描述，生成会议准备清单 JSON：
+          { "agenda": ["..."], "prep_notes": ["..."], "questions": ["..."] }
+  Response Format: json_object
+
+Create Notion Page:
+  Database: <Notion Meetings DB>
+  Properties:
+    Title (title):    ={{ event.summary }}
+    Date (date):      ={{ event.start.dateTime }}
+    Attendees (multi-select): event.attendees emails
+  Blocks:
+    h2: Agenda          → bulleted list from $json.agenda
+    h2: Prep Notes      → bulleted list from $json.prep_notes`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="calendar-to-notion.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 私人事件也被分析">
+  
+  GCal Trigger 会触发所有新事件，包括"健身房"这种私人事件——AI 写一堆没意义的 agenda 反而干扰。**加 IF 过滤**：只处理 attendees > 1（多人会议）的事件。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 会议结束后再触发：拉录音 → AI 总结 → 写回同一 Notion 页
+  - 跟历史 Notion 会议合并：如果是周会，AI 生成"对比上周决议"段落
+  - 加 Slack 提醒：会议前 15 分钟推送 prep notes
+  
+</TipCallout>

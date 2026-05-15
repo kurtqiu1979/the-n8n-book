@@ -1,0 +1,79 @@
+---
+title: Daily Habit Check-in Bot
+description: Telegram pings you nightly → you reply → AI parses → save to Airtable → return completion rate
+sidebar:
+  order: 3
+  label: Case 4.3 · Habit Bot
+difficulty: medium
+theme: productivity
+nodes:
+  - Schedule Trigger
+  - Telegram
+  - AI Agent
+  - Airtable
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/habit-bot.json';
+
+<span class="editorial-label">Part 6 · Case 4.3 · 📅 Productivity</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~30 min · **Core nodes** Telegram dual-trigger × AI parsing
+
+The hardest part of building habits isn't the habits — it's **remembering to log them**. This workflow pings you on Telegram at 10pm, you reply "1,0,1," AI parses to Airtable, instantly returns this week's completion rate.
+
+## 🔍 Workflow
+
+<TerminalCell filename="habit-bot.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={400} />
+</TerminalCell>
+
+Note: this workflow has **two independent chains** — proactive prompt + reactive reply handler.
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Daily 10PM Ask (Schedule):
+  Cron: 0 22 * * *
+  → triggers Ask Telegram with the question
+
+Telegram Reply (Trigger):
+  Updates: [message]
+  → listens for user replies
+
+Parse Reply (AI Agent):
+  System: Parse "1,0,1" into JSON { running, reading, meditation }
+  Response Format: json_object
+
+Save to Airtable:
+  date:        ={{ $now.toISODate() }}
+  running:     ={{ $json.running }}
+  reading:     ={{ $json.reading }}
+  meditation:  ={{ $json.meditation }}
+
+Confirm (Telegram):
+  Text: ✅ Logged! Week completion: {{ Math.round(... * 100) }}%`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="habit-bot.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · User reply formats are wild">
+  
+  "1,0,1" / "1 0 1" / "ran, didn't read, meditated" / "did nothing today" — users won't follow your format. **AI-tolerant parsing** beats regex by 10×. Give the System Message multiple example formats.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Add Memory so AI remembers your habit list (don't hardcode)
+  - Sunday-trigger "weekly report": aggregate Airtable data, AI writes encouragement/reflection
+  - Multi-user: differentiate by Telegram chat_id
+  
+</TipCallout>

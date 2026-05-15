@@ -1,0 +1,92 @@
+{
+  "name": "Daily Habit Check-in Bot",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 22 * * *" }] } },
+      "id": "node-schedule",
+      "name": "Daily 10PM Ask",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_ID>",
+        "text": "🎯 今日打卡 (回 1=完成, 0=没做)\n• 跑步\n• 阅读 30 分钟\n• 冥想",
+        "additionalFields": {}
+      },
+      "id": "node-tg-ask",
+      "name": "Ask Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [480, 200]
+    },
+    {
+      "parameters": { "updates": ["message"] },
+      "id": "node-tg-trigger",
+      "name": "Telegram Reply",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 480]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "用户的打卡格式像 \"1, 0, 1\" 三个数字对应跑步/阅读/冥想。解析为 JSON：\n{ \"running\": 1, \"reading\": 0, \"meditation\": 1 }\n只回 JSON。"
+        }
+      },
+      "id": "node-parse",
+      "name": "Parse Reply",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [480, 480]
+    },
+    {
+      "parameters": { "model": "gpt-4o-mini", "options": { "responseFormat": "json_object" } },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [480, 680]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "habits",
+        "fields": {
+          "values": {
+            "date": "={{ $now.toISODate() }}",
+            "running": "={{ $json.running }}",
+            "reading": "={{ $json.reading }}",
+            "meditation": "={{ $json.meditation }}"
+          }
+        }
+      },
+      "id": "node-airtable",
+      "name": "Save to Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [780, 480]
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_ID>",
+        "text": "=✅ 已记录！本周完成率 {{ Math.round(($json.running + $json.reading + $json.meditation) / 3 * 100) }}%"
+      },
+      "id": "node-tg-reply",
+      "name": "Confirm",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1020, 480]
+    }
+  ],
+  "connections": {
+    "Daily 10PM Ask": { "main": [[{ "node": "Ask Telegram", "type": "main", "index": 0 }]] },
+    "Telegram Reply": { "main": [[{ "node": "Parse Reply", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "Parse Reply", "type": "ai_languageModel", "index": 0 }]] },
+    "Parse Reply": { "main": [[{ "node": "Save to Airtable", "type": "main", "index": 0 }]] },
+    "Save to Airtable": { "main": [[{ "node": "Confirm", "type": "main", "index": 0 }]] }
+  }
+}

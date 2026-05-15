@@ -1,0 +1,75 @@
+---
+title: 每日邮件摘要
+description: 每天早 8 点拉昨日未读邮件 → AI 分类总结 → Slack DM 推送给你
+sidebar:
+  order: 1
+  label: 案例 4.1 · 每日邮件摘要
+difficulty: easy
+theme: productivity
+nodes:
+  - Schedule Trigger
+  - Gmail
+  - Aggregate
+  - AI Agent
+  - Slack
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/daily-email-digest.json';
+
+<span class="editorial-label">第 6 部分 · 案例 4.1 · 📅 个人生产力</span>
+
+> **难度** 🟢 简单 · **耗时** ~20 分钟 · **核心节点** Gmail × Aggregate × AI 总结
+
+每天打开邮箱 100+ 未读，光分类就累瘫。这个 workflow 替你扫一遍昨日新邮件，AI 分为"🔥 重要待办 / 📰 信息更新 / 🗑 可忽略"三类，Slack DM 推送，**3 分钟读完今日邮件**。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="daily-email-digest.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={300} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Fetch Unread Emails:
+  Operation: Get Many
+  Filters:   labelIds = [INBOX], q = "is:unread newer_than:1d"
+  Limit:     50
+
+Aggregate Snippets:
+  Field: snippet
+  → 把 N 个 item 的 snippet 字段聚合成一个数组
+
+AI Digest:
+  System: 你是邮件助理。把这些邮件总结成 3 类:
+          - 🔥 重要待办 (最多 5 条)
+          - 📰 信息更新 (一句话每个)
+          - 🗑 可忽略
+
+DM to Slack:
+  Channel: @you  (用 DM 形式)`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="daily-email-digest.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · Gmail snippet 太短，AI 判断不准">
+  
+  `snippet` 字段只有前 100 字。重要邮件可能正文才有关键信息。改用 `body` 字段（但 token 多 10 倍）或先用 IF 过滤"老板/客户"等关键发件人 → 优先级邮件单独处理。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 Vision 节点分析附件图片（截图、PPT 摘要）
+  - 重要邮件自动起草回复草稿（gpt-4o）
+  - 周末批量"待回复"清单
+  
+</TipCallout>

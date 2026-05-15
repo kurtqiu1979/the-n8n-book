@@ -1,0 +1,79 @@
+---
+title: 每日习惯打卡机器人
+description: 每晚 10 点 Telegram 询问 → 用户回复 → AI 解析 → 落 Airtable → 反馈完成率
+sidebar:
+  order: 3
+  label: 案例 4.3 · 习惯打卡 Bot
+difficulty: medium
+theme: productivity
+nodes:
+  - Schedule Trigger
+  - Telegram
+  - AI Agent
+  - Airtable
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/habit-bot.json';
+
+<span class="editorial-label">第 6 部分 · 案例 4.3 · 📅 个人生产力</span>
+
+> **难度** 🟡 中等 · **耗时** ~30 分钟 · **核心节点** Telegram 双触发器 × AI 解析
+
+习惯养成最痛的不是坚持，是**忘记打卡**。这个 workflow 每晚 10 点主动找你（Telegram 推送），你随手回个"1,0,1"，AI 解析后写入 Airtable，立刻告诉你本周完成率。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="habit-bot.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={400} />
+</TerminalCell>
+
+注意这是一个 workflow 里有**两条独立链路**——主动推送 + 被动接收回复。
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Daily 10PM Ask (Schedule):
+  Cron: 0 22 * * *
+  → 触发 Ask Telegram 主动发问题
+
+Telegram Reply (Trigger):
+  Updates: [message]
+  → 监听用户回复
+
+Parse Reply (AI Agent):
+  System: 解析 "1,0,1" 为 JSON { running, reading, meditation }
+  Response Format: json_object
+
+Save to Airtable:
+  date:        ={{ $now.toISODate() }}
+  running:     ={{ $json.running }}
+  reading:     ={{ $json.reading }}
+  meditation:  ={{ $json.meditation }}
+
+Confirm (Telegram):
+  Text: ✅ 已记录！本周完成率 {{ Math.round(... * 100) }}%`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="habit-bot.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 用户回复格式千变万化">
+  
+  "1,0,1" / "1 0 1" / "跑了没读冥想了" / "今天都没做" —— 用户不会按你想的格式答。**让 AI 容错解析**比写正则强 10 倍。System Message 要给 AI 各种格式的样例。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 Memory：让 AI 记得用户的习惯名单，不要每次硬编码
+  - 周日触发"周报"：从 Airtable 聚合本周数据，AI 写一段鼓励/反思
+  - 多用户：用 Telegram chat_id 区分，每人独立打卡
+  
+</TipCallout>
