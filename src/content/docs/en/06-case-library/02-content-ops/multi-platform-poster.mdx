@@ -1,0 +1,102 @@
+---
+title: One-Click Multi-Platform Poster
+description: Notion "Ready" → AI rewrites for 3 platforms → posts to Twitter / LinkedIn / Medium → marks Published
+sidebar:
+  order: 1
+  label: Case 2.1 · Multi-Platform Poster
+difficulty: medium
+theme: content-ops
+nodes:
+  - Notion Trigger
+  - AI Agent
+  - Twitter
+  - LinkedIn
+  - Medium
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/multi-platform-poster.json';
+
+<span class="editorial-label">Part 6 · Case 2.1 · ✍️ Content Ops</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~30 min · **Core nodes** Notion Trigger × AI Rewriter × multi-output
+
+The classic creator pain: you write one good piece, then manually rewrite it three different ways for three different platforms. This workflow lets you **write once in Notion, distribute everywhere automatically**.
+
+## 🎯 Scenario
+
+- Solo creator: one piece → Twitter / LinkedIn / Medium auto-distribution
+- Company blog: same article to every social channel
+- Team workflow: Notion as the control center
+
+## 🔍 Workflow
+
+<TerminalCell filename="multi-platform-poster.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={380} />
+</TerminalCell>
+
+## 📋 Key configs
+
+### Notion Trigger
+
+<TerminalCell filename="notion-trigger.txt" runTag="⚙">
+{`Poll Times: every minute
+Database ID: <your Notion DB ID>
+Filter:      Status = "Ready to Publish"
+
+Workflow fires when you flip the status in Notion.`}
+</TerminalCell>
+
+### AI Rewriter
+
+<TerminalCell filename="ai-rewriter.txt" runTag="⚙">
+{`System Message:
+   Rewrite the article into three platform-specific versions, return JSON:
+   { "twitter": "<280 chars, hook, emoji ok>",
+     "linkedin": "<professional tone, 3 paragraphs, opening hook>",
+     "medium": "<keep length, add catchy section headings>" }
+   Return ONLY JSON.
+
+Attached OpenAI:
+  Model:           gpt-4o-mini
+  Response Format: json_object`}
+</TerminalCell>
+
+### Three publishers in parallel
+
+<TerminalCell filename="three-publishers.txt" runTag="⚙">
+{`Twitter:  Text = {{ $json.twitter }}
+LinkedIn: Text = {{ $json.linkedin }}
+Medium:   Content = {{ $json.medium }}`}
+</TerminalCell>
+
+### Mark Published
+
+<TerminalCell filename="mark-published.txt" runTag="⚙">
+{`Operation: Update Page
+Page ID:   ={{ $('Notion Trigger').item.json.id }}
+Updates:   Status = "Published", PublishedAt = ={{ $now.toISO() }}`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="multi-platform-poster.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Same article published twice">
+  
+  If you don't flip Status to "Published" at the end, the next Notion Trigger poll still matches the filter → **re-publish**. Always include the Mark Published step.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Add an IF node: route by article tag (tech posts skip LinkedIn)
+  - Vision-analyze attached images, add image descriptions to the Twitter version
+  - Error handling: failed platforms fall back to draft mode
+  
+</TipCallout>

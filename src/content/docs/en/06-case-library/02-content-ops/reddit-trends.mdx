@@ -1,0 +1,115 @@
+---
+title: Daily Reddit Trends Digest
+description: Every 8am, scan multiple subreddits' daily top → AI summarize → email "today's 3 must-reads"
+sidebar:
+  order: 3
+  label: Case 2.3 · Reddit Trends
+difficulty: easy
+theme: content-ops
+nodes:
+  - Schedule Trigger
+  - HTTP Request
+  - Split Out
+  - AI Agent
+  - Email Send
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/reddit-trends.json';
+
+<span class="editorial-label">Part 6 · Case 2.3 · ✍️ Content Ops</span>
+
+> **Difficulty** 🟢 Easy · **Time** ~20 min · **Core nodes** Schedule × Split Out × AI Summarize
+
+Subscribed to a stack of subreddits but find yourself spending 2 hours scrolling each time you open Reddit? This workflow scans for you every 8am, AI summarizes "today's 3 must-reads," emails them — **3 min to read, rest of the time for real work**.
+
+## 🎯 Scenario
+
+- Info workers tracking topical hotspots across multiple domains
+- Want signal without Reddit's algorithm rabbit-holes
+- Send a "domain essentials" digest to team/subscribers
+
+## 🔍 Workflow
+
+<TerminalCell filename="reddit-trends.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 Key configs
+
+### Daily Schedule
+
+<TerminalCell filename="schedule.txt" runTag="⚙">
+{`Mode:             Custom Cron Expression
+Cron Expression:  0 8 * * *      # daily 8am
+Note timezone settings (see Part 3 §3.5 trap 5)`}
+</TerminalCell>
+
+### Set Subreddits + Split Out
+
+<TerminalCell filename="set-split.txt" runTag="⚙">
+{`Set:        subreddits = "n8n,LocalLLaMA,nocode,automation"
+Split Out:  Field = subreddits, Delimiter = ","
+
+Effect: 4 items, each is one subreddit name`}
+</TerminalCell>
+
+### Fetch Top Posts (no Reddit API key needed)
+
+Reddit's public JSON endpoint requires no credentials:
+
+<TerminalCell filename="fetch-reddit.txt" runTag="⚙">
+{`Method:  GET
+URL:     =https://www.reddit.com/r/{{ $json.subreddits }}/top.json?t=day&limit=5
+
+Output: top 5 posts of the day per subreddit`}
+</TerminalCell>
+
+### AI Summarize
+
+<TerminalCell filename="ai-summarize.txt" runTag="⚙">
+{`Prompt:
+   ={{ JSON.stringify($json.data.children.map(c => ({
+       title: c.data.title,
+       score: c.data.score,
+       url: 'https://reddit.com' + c.data.permalink
+   }))) }}
+
+System Message:
+   Summarize this batch of Reddit posts (under 200 words),
+   pick the top 3 most interesting; each with title, why it's interesting, and link.`}
+</TerminalCell>
+
+### Send Email
+
+<TerminalCell filename="send-email.txt" runTag="⚙">
+{`To:       you@example.com
+Subject:  =Reddit Trends Digest · {{ $now.toFormat('yyyy-MM-dd') }}
+HTML:     ={{ $json.output }}`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="reddit-trends.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Reddit public endpoint rate-limits">
+  
+  Reddit's public JSON API rate-limits unauthenticated requests strictly (60/min). Fetching many subreddits at once can trip it. Either:
+  
+  - Use SplitInBatches to throttle (1 per second)
+  - Register a Reddit API key — much higher limits after auth
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Add Filter: keep only score > 500 posts (quality threshold)
+  - Replace email with a Telegram bot push
+  - Add RAG: store each subreddit's history in Pinecone, do "trend comparison over the past week"
+  
+</TipCallout>

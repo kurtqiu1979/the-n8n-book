@@ -1,0 +1,113 @@
+---
+title: YouTube SEO 自动化
+description: 每天扫新视频 → 拉转录 → AI 生成标题/描述/标签/章节时间戳 → 自动更新到 YouTube
+sidebar:
+  order: 2
+  label: 案例 2.2 · YouTube SEO
+difficulty: medium
+theme: content-ops
+nodes:
+  - Schedule Trigger
+  - YouTube
+  - HTTP Request
+  - AI Agent
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/youtube-seo.json';
+
+<span class="editorial-label">第 6 部分 · 案例 2.2 · ✍️ 内容运营</span>
+
+> **难度** 🟡 中等 · **耗时** ~40 分钟 · **核心节点** YouTube API × AI Agent (JSON mode)
+
+发了视频却懒得写优质 SEO？这个 workflow 每天扫一遍你的新上传视频，自动拉转录、用 AI 生成吸引点击的标题、含关键词的描述、标签数组、章节时间戳——一键更新到 YouTube。
+
+## 🎯 场景
+
+- YouTuber 个人创作，每天有 1-2 条新视频，懒得手动写 SEO
+- 教程类频道，章节时间戳能大幅提升完播率
+- 团队批量管理多个频道
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="youtube-seo.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 关键节点
+
+### YouTube - List Recent Videos
+
+<TerminalCell filename="yt-list.txt" runTag="⚙">
+{`Resource:   Video
+Operation:  Search
+Channel ID: <你的 channel ID>
+Published After: ={{ $now.minus({days: 1}).toISO() }}
+
+只取最近 24 小时上传的`}
+</TerminalCell>
+
+### Fetch Transcript
+
+YouTube 节点本身不直接支持拉转录。用 HTTP Request 调 YouTube Captions API：
+
+<TerminalCell filename="fetch-transcript.txt" runTag="⚙">
+{`Method:  GET
+URL:     =https://www.googleapis.com/youtube/v3/captions?videoId={{ $json.id.videoId }}&part=snippet
+Auth:    OAuth2 (Google credentials)`}
+</TerminalCell>
+
+### SEO Generator (AI Agent)
+
+<TerminalCell filename="seo-ai.txt" runTag="⚙">
+{`System Message:
+  你是 YouTube SEO 专家。读完转录后生成 JSON：
+  {
+    "title": "60 字内吸引点击的标题",
+    "description": "前 100 字含关键词的描述，后跟分段时间戳",
+    "tags": ["15 个 SEO 标签"],
+    "chapters": [{"time": "00:00", "title": "开场"}, ...]
+  }
+  只回 JSON。
+
+挂载 OpenAI Chat Model:
+  Model:           gpt-4o    ← 用 gpt-4o 而非 mini（视频转录长，要更强模型）
+  Response Format: json_object`}
+</TerminalCell>
+
+### YouTube - Update Metadata
+
+<TerminalCell filename="yt-update.txt" runTag="⚙">
+{`Operation: Update Video
+Video ID:  ={{ $('YouTube - List Recent Videos').item.json.id.videoId }}
+Updates:
+  title:        ={{ $json.title }}
+  description:  ={{ $json.description }}
+  tags:         ={{ $json.tags.join(',') }}`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="youtube-seo.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 转录字幕不存在">
+  
+  YouTube 自动字幕需要时间生成，刚上传的视频可能还没有字幕。两种解法：
+  
+  - 延后跑：Schedule 改为视频上传后 2 小时
+  - Fallback：检测字幕不存在时跳过该视频，加 Continue On Fail
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 Vision 节点分析视频封面，AI 给"封面优化建议"
+  - 生成 chapters 后自动追加到 description 顶部
+  - 把生成的标题做 A/B 测试，1 小时后看哪个点击率高
+  
+</TipCallout>

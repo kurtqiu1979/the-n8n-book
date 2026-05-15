@@ -1,0 +1,106 @@
+---
+title: 一键多平台分发器
+description: Notion 标记"待发布" → AI 改写为 3 个平台版本 → 同时发 Twitter / LinkedIn / Medium → 回写 Published
+sidebar:
+  order: 1
+  label: 案例 2.1 · 多平台分发
+difficulty: medium
+theme: content-ops
+nodes:
+  - Notion Trigger
+  - AI Agent
+  - Twitter
+  - LinkedIn
+  - Medium
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/multi-platform-poster.json';
+
+<span class="editorial-label">第 6 部分 · 案例 2.1 · ✍️ 内容运营</span>
+
+> **难度** 🟡 中等 · **耗时** ~30 分钟 · **核心节点** Notion Trigger × AI Rewriter × 多输出分支
+
+内容创作者最大的运营痛点：写了一篇好文，要手动改写成 3 个平台不同腔调的版本，分别发出去。这个 workflow 让你**在 Notion 写完一次、其余全自动**。
+
+## 🎯 场景
+
+- 个人博主：一文多发到 Twitter / LinkedIn / Medium
+- 公司公众号：同一篇文章自动分发到所有社交渠道
+- 通过 Notion 当中控台，团队成员都能用
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="multi-platform-poster.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={380} />
+</TerminalCell>
+
+## 📋 关键节点
+
+### Notion Trigger
+
+<TerminalCell filename="notion-trigger.txt" runTag="⚙">
+{`Poll Times: every minute
+Database ID: <你的 Notion 库 ID>
+Filter:      Status = "Ready to Publish"
+
+当你在 Notion 把状态改成 "Ready to Publish"，workflow 就启动。`}
+</TerminalCell>
+
+### AI Rewriter（核心）
+
+<TerminalCell filename="ai-rewriter.txt" runTag="⚙">
+{`System Message:
+   把原始文章改写成 3 个平台版本，输出 JSON：
+   { "twitter": "280 字内、有钩子、用 emoji",
+     "linkedin": "专业商务腔，3 段，第一段挂钩",
+     "medium": "保持原长，加吸引人的小标题" }
+   只回 JSON。
+
+挂载 OpenAI Chat Model:
+  Model:            gpt-4o-mini
+  Response Format:  json_object`}
+</TerminalCell>
+
+### 三个发布节点（并行）
+
+AI Rewriter 输出连接到 Twitter / LinkedIn / Medium **三个节点同时**（共享同一个输入 item）：
+
+<TerminalCell filename="three-publishers.txt" runTag="⚙">
+{`Twitter:   Text = {{ $json.twitter }}
+LinkedIn:  Text = {{ $json.linkedin }}
+Medium:    Title = (from Notion), Content = {{ $json.medium }}`}
+</TerminalCell>
+
+### Mark Published
+
+<TerminalCell filename="mark-published.txt" runTag="⚙">
+{`Operation: Update Page
+Page ID:   ={{ $('Notion Trigger').item.json.id }}
+Update:
+  Status:      Published
+  PublishedAt: ={{ $now.toISO() }}`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="multi-platform-poster.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 一篇文章被发了两次">
+  
+  如果你不在末尾把 Status 改成 "Published"，下次 Notion Trigger poll 时它还满足 filter → **再次发布**。务必加 Mark Published 节点。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 IF 节点：根据文章 tag 决定发哪些平台（技术文章不发 LinkedIn）
+  - AI 改写前加图片 Vision 分析，让 Twitter 版本带配图描述
+  - 加错误处理：某个平台发失败时自动 fallback 到草稿
+  
+</TipCallout>

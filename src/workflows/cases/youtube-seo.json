@@ -1,0 +1,89 @@
+{
+  "name": "YouTube SEO Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 24 }] }
+      },
+      "id": "node-schedule",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "search",
+        "channelId": "<YOUR_CHANNEL_ID>",
+        "additionalFields": { "publishedAfter": "={{ $now.minus({days: 1}).toISO() }}" }
+      },
+      "id": "node-yt-search",
+      "name": "YouTube - List Recent Videos",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [420, 400]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/youtube/v3/captions?videoId={{ $json.id.videoId }}&part=snippet",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api"
+      },
+      "id": "node-fetch-transcript",
+      "name": "Fetch Transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 400]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.transcript }}",
+        "options": {
+          "systemMessage": "你是 YouTube SEO 专家。读完转录后生成：\n{\n  \"title\": \"60 字内吸引点击的标题\",\n  \"description\": \"前 100 字含关键词的描述，后跟分段时间戳\",\n  \"tags\": [\"15 个 SEO 标签数组\"],\n  \"chapters\": [{\"time\": \"00:00\", \"title\": \"开场\"}, ...]\n}\n只回 JSON。"
+        }
+      },
+      "id": "node-seo-ai",
+      "name": "SEO Generator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [860, 400]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": { "responseFormat": "json_object" }
+      },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [860, 600]
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "update",
+        "videoId": "={{ $('YouTube - List Recent Videos').item.json.id.videoId }}",
+        "updateFields": {
+          "title": "={{ $json.title }}",
+          "description": "={{ $json.description }}",
+          "tags": "={{ $json.tags.join(',') }}"
+        }
+      },
+      "id": "node-yt-update",
+      "name": "YouTube - Update Metadata",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [1100, 400]
+    }
+  ],
+  "connections": {
+    "Daily Schedule": { "main": [[{ "node": "YouTube - List Recent Videos", "type": "main", "index": 0 }]] },
+    "YouTube - List Recent Videos": { "main": [[{ "node": "Fetch Transcript", "type": "main", "index": 0 }]] },
+    "Fetch Transcript": { "main": [[{ "node": "SEO Generator", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "SEO Generator", "type": "ai_languageModel", "index": 0 }]] },
+    "SEO Generator": { "main": [[{ "node": "YouTube - Update Metadata", "type": "main", "index": 0 }]] }
+  }
+}

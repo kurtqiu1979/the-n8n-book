@@ -1,0 +1,101 @@
+{
+  "name": "Multi-Platform Auto Poster",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": { "item": [{ "mode": "everyMinute" }] },
+        "databaseId": "<NOTION_DB_ID>",
+        "filterType": "manual",
+        "filters": { "conditions": [{ "field": "Status", "value": "Ready to Publish" }] }
+      },
+      "id": "node-notion-trigger",
+      "name": "Notion Trigger",
+      "type": "n8n-nodes-base.notionTrigger",
+      "typeVersion": 1,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.title + '\\n\\n' + $json.body }}",
+        "options": {
+          "systemMessage": "把原始文章改写成 3 个平台的版本，输出 JSON：{\"twitter\": \"...\", \"linkedin\": \"...\", \"medium\": \"...\"}。Twitter 280 字内；LinkedIn 专业商务腔；Medium 保持原长加吸引人的小标题。只回 JSON。"
+        }
+      },
+      "id": "node-rewriter",
+      "name": "AI Rewriter",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": { "responseFormat": "json_object" }
+      },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [480, 600]
+    },
+    {
+      "parameters": { "text": "={{ $json.twitter }}" },
+      "id": "node-twitter",
+      "name": "Post to Twitter/X",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [780, 280]
+    },
+    {
+      "parameters": { "text": "={{ $json.linkedin }}" },
+      "id": "node-linkedin",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [780, 400]
+    },
+    {
+      "parameters": {
+        "title": "={{ $('Notion Trigger').item.json.title }}",
+        "contentFormat": "markdown",
+        "content": "={{ $json.medium }}"
+      },
+      "id": "node-medium",
+      "name": "Post to Medium",
+      "type": "n8n-nodes-base.medium",
+      "typeVersion": 1,
+      "position": [780, 520]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Notion Trigger').item.json.id }}",
+        "updateFields": {
+          "values": {
+            "Status": "Published",
+            "PublishedAt": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "id": "node-notion-update",
+      "name": "Mark Published",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1080, 400]
+    }
+  ],
+  "connections": {
+    "Notion Trigger": { "main": [[{ "node": "AI Rewriter", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "AI Rewriter", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Rewriter": {
+      "main": [[
+        { "node": "Post to Twitter/X", "type": "main", "index": 0 },
+        { "node": "Post to LinkedIn", "type": "main", "index": 0 },
+        { "node": "Post to Medium", "type": "main", "index": 0 }
+      ]]
+    },
+    "Post to Twitter/X": { "main": [[{ "node": "Mark Published", "type": "main", "index": 0 }]] }
+  }
+}

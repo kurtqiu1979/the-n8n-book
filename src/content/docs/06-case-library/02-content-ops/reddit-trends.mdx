@@ -1,0 +1,115 @@
+---
+title: Reddit 热点每日聚合
+description: 每天早 8 点扫多个 subreddit 的当日 top 帖 → AI 总结 → 邮件推送一份"今日值得看 3 条"
+sidebar:
+  order: 3
+  label: 案例 2.3 · Reddit 趋势
+difficulty: easy
+theme: content-ops
+nodes:
+  - Schedule Trigger
+  - HTTP Request
+  - Split Out
+  - AI Agent
+  - Email Send
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/reddit-trends.json';
+
+<span class="editorial-label">第 6 部分 · 案例 2.3 · ✍️ 内容运营</span>
+
+> **难度** 🟢 简单 · **耗时** ~20 分钟 · **核心节点** Schedule × Split Out × AI Summarize
+
+订阅了一堆 subreddit，但每天打开 Reddit 总会刷上 2 小时？这个 workflow 每天早 8 点替你扫一遍，AI 总结"今天值得看的 3 条"邮件推送给你——**3 分钟读完，剩下时间干正事**。
+
+## 🎯 场景
+
+- 信息工作者：每天要追多个领域的热点（AI / NoCode / Automation 等）
+- 不想沉迷 Reddit 算法推送但又怕错过
+- 想让团队/订阅者每天收到一份"领域精华"
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="reddit-trends.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 关键节点
+
+### Daily Schedule（cron）
+
+<TerminalCell filename="schedule.txt" runTag="⚙">
+{`Mode:             Custom Cron Expression
+Cron Expression:  0 8 * * *      # 每天早 8 点
+注意时区设置：见 [3.5 节坑 5](../../../03-expressions/beginner-traps/)`}
+</TerminalCell>
+
+### Set Subreddits + Split Out
+
+<TerminalCell filename="set-split.txt" runTag="⚙">
+{`Set:        subreddits = "n8n,LocalLLaMA,nocode,automation"
+Split Out:  Field = subreddits, Delimiter = ","
+
+效果：4 个 items，每个 item 是一个 subreddit 名`}
+</TerminalCell>
+
+### Fetch Top Posts（无需 Reddit API key）
+
+Reddit 公开 JSON 接口直接调，不要凭证：
+
+<TerminalCell filename="fetch-reddit.txt" runTag="⚙">
+{`Method:  GET
+URL:     =https://www.reddit.com/r/{{ $json.subreddits }}/top.json?t=day&limit=5
+
+输出：每个 subreddit 的当日 top 5 帖子`}
+</TerminalCell>
+
+### AI Summarize
+
+<TerminalCell filename="ai-summarize.txt" runTag="⚙">
+{`Prompt:
+   ={{ JSON.stringify($json.data.children.map(c => ({
+       title: c.data.title,
+       score: c.data.score,
+       url: 'https://reddit.com' + c.data.permalink
+   }))) }}
+
+System Message:
+   把这批 Reddit 帖子总结成一段中文摘要（200 字内），
+   列出最值得看的 3 个，每个含标题、为什么有趣、链接。`}
+</TerminalCell>
+
+### Send Email
+
+<TerminalCell filename="send-email.txt" runTag="⚙">
+{`To:       you@example.com
+Subject:  =Reddit 热点摘要 · {{ $now.toFormat('yyyy-MM-dd') }}
+HTML:     ={{ $json.output }}`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="reddit-trends.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · Reddit 公开接口偶尔限流">
+  
+  Reddit 公开 JSON 接口对未认证请求有较严限流（每分钟 60 次）。多个 subreddit 一次性拉容易触发。可以：
+  
+  - SplitInBatches 限速（每秒一个）
+  - 或注册 Reddit API key，授权后限流松很多
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 Filter：只保留 score > 500 的帖子（高质量门槛）
+  - 把邮件换成 Telegram bot 推送
+  - 加 RAG：把每个 subreddit 历史摘要存 Pinecone，做"过去一周的趋势对比"
+  
+</TipCallout>

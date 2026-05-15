@@ -1,0 +1,113 @@
+---
+title: YouTube SEO Automation
+description: Daily scan new uploads → fetch transcript → AI generates title/desc/tags/chapters → auto-update YouTube
+sidebar:
+  order: 2
+  label: Case 2.2 · YouTube SEO
+difficulty: medium
+theme: content-ops
+nodes:
+  - Schedule Trigger
+  - YouTube
+  - HTTP Request
+  - AI Agent
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/youtube-seo.json';
+
+<span class="editorial-label">Part 6 · Case 2.2 · ✍️ Content Ops</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~40 min · **Core nodes** YouTube API × AI Agent (JSON mode)
+
+Uploaded the video but too lazy to write good SEO? This workflow scans your new uploads daily, pulls transcripts, uses AI to generate clickbait-but-honest titles, keyword-rich descriptions, tag arrays, and chapter timestamps — all auto-pushed to YouTube.
+
+## 🎯 Scenario
+
+- Solo YouTubers shipping 1-2 videos a day
+- Tutorial channels — chapter timestamps boost completion rate
+- Teams managing multiple channels
+
+## 🔍 Workflow
+
+<TerminalCell filename="youtube-seo.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 Key configs
+
+### YouTube - List Recent Videos
+
+<TerminalCell filename="yt-list.txt" runTag="⚙">
+{`Resource:   Video
+Operation:  Search
+Channel ID: <your channel ID>
+Published After: ={{ $now.minus({days: 1}).toISO() }}
+
+Only last 24 hours' uploads.`}
+</TerminalCell>
+
+### Fetch Transcript
+
+The YouTube node doesn't expose transcripts directly. HTTP Request against YouTube Captions API:
+
+<TerminalCell filename="fetch-transcript.txt" runTag="⚙">
+{`Method:  GET
+URL:     =https://www.googleapis.com/youtube/v3/captions?videoId={{ $json.id.videoId }}&part=snippet
+Auth:    OAuth2 (Google credentials)`}
+</TerminalCell>
+
+### SEO Generator (AI Agent)
+
+<TerminalCell filename="seo-ai.txt" runTag="⚙">
+{`System Message:
+  You are a YouTube SEO expert. After reading the transcript, generate JSON:
+  {
+    "title": "<60-char hook title>",
+    "description": "<first 100 chars with keywords, then chapter timestamps>",
+    "tags": ["<15 SEO tags>"],
+    "chapters": [{"time": "00:00", "title": "Intro"}, ...]
+  }
+  Return ONLY JSON.
+
+Attached OpenAI:
+  Model:           gpt-4o    ← use gpt-4o (transcripts are long, need stronger model)
+  Response Format: json_object`}
+</TerminalCell>
+
+### YouTube - Update Metadata
+
+<TerminalCell filename="yt-update.txt" runTag="⚙">
+{`Operation: Update Video
+Video ID:  ={{ $('YouTube - List Recent Videos').item.json.id.videoId }}
+Updates:
+  title:        ={{ $json.title }}
+  description:  ={{ $json.description }}
+  tags:         ={{ $json.tags.join(',') }}`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="youtube-seo.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · No captions yet">
+  
+  YouTube auto-captions take some time after upload. Fresh videos may have no captions yet. Two fixes:
+  
+  - Delay schedule: 2 hours after upload
+  - Fallback: detect missing captions, skip the video, Continue On Fail
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Add a Vision node to analyze the thumbnail; AI suggests "thumbnail improvements"
+  - Auto-prepend generated chapters to description
+  - A/B test generated titles; check CTR an hour later, pick winner
+  
+</TipCallout>

@@ -1,0 +1,94 @@
+{
+  "name": "Reddit Trends Daily Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }] }
+      },
+      "id": "node-schedule",
+      "name": "Daily 8AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [{ "name": "subreddits", "value": "n8n,LocalLLaMA,nocode,automation" }]
+        }
+      },
+      "id": "node-set",
+      "name": "Set Subreddits",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 400]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "subreddits",
+        "options": { "delimiter": "," }
+      },
+      "id": "node-split",
+      "name": "Split Subreddits",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [600, 400]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.reddit.com/r/{{ $json.subreddits }}/top.json?t=day&limit=5",
+        "options": {}
+      },
+      "id": "node-fetch",
+      "name": "Fetch Top Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 400]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json.data.children.map(c => ({title: c.data.title, score: c.data.score, url: 'https://reddit.com' + c.data.permalink}))) }}",
+        "options": {
+          "systemMessage": "把这批 Reddit 帖子总结成一段中文摘要（200 字内），列出最值得看的 3 个，每个含标题、为什么有趣、链接。"
+        }
+      },
+      "id": "node-summarize",
+      "name": "AI Summarize",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini"
+      },
+      "id": "node-llm",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1000, 600]
+    },
+    {
+      "parameters": {
+        "fromEmail": "digest@example.com",
+        "toEmail": "you@example.com",
+        "subject": "=Reddit 热点摘要 · {{ $now.toFormat('yyyy-MM-dd') }}",
+        "html": "={{ $json.output }}"
+      },
+      "id": "node-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1240, 400]
+    }
+  ],
+  "connections": {
+    "Daily 8AM": { "main": [[{ "node": "Set Subreddits", "type": "main", "index": 0 }]] },
+    "Set Subreddits": { "main": [[{ "node": "Split Subreddits", "type": "main", "index": 0 }]] },
+    "Split Subreddits": { "main": [[{ "node": "Fetch Top Posts", "type": "main", "index": 0 }]] },
+    "Fetch Top Posts": { "main": [[{ "node": "AI Summarize", "type": "main", "index": 0 }]] },
+    "OpenAI": { "ai_languageModel": [[{ "node": "AI Summarize", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Summarize": { "main": [[{ "node": "Send Email", "type": "main", "index": 0 }]] }
+  }
+}
