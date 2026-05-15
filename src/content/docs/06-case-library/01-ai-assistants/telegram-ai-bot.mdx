@@ -1,0 +1,96 @@
+---
+title: Telegram AI 聊天机器人
+description: 用户在 Telegram 给 bot 发消息 → AI Agent 回复 → 自动记得多轮上下文
+sidebar:
+  order: 1
+  label: 案例 1.1 · Telegram AI Bot
+difficulty: easy
+theme: ai-assistants
+nodes:
+  - Telegram Trigger
+  - AI Agent
+  - OpenAI Chat Model
+  - Window Buffer Memory
+  - Telegram
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/telegram-ai-bot.json';
+
+<span class="editorial-label">第 6 部分 · 案例 1.1 · 🤖 AI 助手</span>
+
+> **难度** 🟢 简单 · **耗时** ~15 分钟 · **核心节点** Telegram Trigger × AI Agent × Memory
+
+把一个 OpenAI Chat 接到 Telegram，**5 个节点**就能让你拥有一个能记得对话上下文的私人 AI 助手。这是入门 AI 自动化最好的第一个项目——你能立刻在手机上聊到。
+
+## 🎯 场景
+
+- 你想要一个手机随时能聊的 AI 助手，又不想付 ChatGPT 订阅
+- 想给家人/朋友做个共享 bot，每人记忆隔离
+- 当作其他更复杂 AI workflow 的"入口"测试床
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="telegram-ai-bot.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 关键节点配置
+
+### Telegram Trigger
+
+去 Telegram 找 [@BotFather](https://t.me/BotFather) 注册一个 bot，拿到 token，在 n8n 配 Telegram Credentials。然后：
+
+<TerminalCell filename="telegram-trigger.txt" runTag="⚙">
+{`Updates: [message]
+Credentials: <your-telegram-bot>`}
+</TerminalCell>
+
+### AI Agent
+
+<TerminalCell filename="ai-agent.txt" runTag="⚙">
+{`Prompt:  ={{ $json.message.text }}
+System Message:
+   你是一个友好的中文 AI 助手，回答要简洁、有温度。
+Max Iterations: 5`}
+</TerminalCell>
+
+### Window Buffer Memory（关键！）
+
+<TerminalCell filename="memory.txt" runTag="⚙">
+{`Session Key:            ={{ $('Telegram Trigger').item.json.message.from.id }}
+Context Window Length:  10
+
+⚠ Session Key 必须用 Telegram user id 才能做到"每人独立记忆"`}
+</TerminalCell>
+
+### Send Telegram Reply
+
+<TerminalCell filename="send-reply.txt" runTag="⚙">
+{`Chat ID: ={{ $('Telegram Trigger').item.json.message.chat.id }}
+Text:    ={{ $json.output }}`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="telegram-ai-bot.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+{`\n# 复制后到 n8n 画布右键 → Paste 即导入`}
+</TerminalCell>
+
+<TipCallout type="warn" title="新手坑 · Session Key 写错串台">
+  
+  如果 Session Key 写成固定字符串（如 "default"），所有用户共用同一份记忆——他们会读到彼此的对话。**永远用 `from.id` 这样的动态值**。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加一个 HTTP Tool 让 bot 能查天气
+  - Memory 换成 Postgres Chat Memory，让重启 n8n 后记忆不丢
+  - 加 IF 节点过滤：只回复包含特定关键词的消息
+  
+</TipCallout>

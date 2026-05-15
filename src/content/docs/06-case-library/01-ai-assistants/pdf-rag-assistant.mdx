@@ -1,0 +1,100 @@
+---
+title: PDF RAG 智能问答助手
+description: 把任意 PDF 喂进向量库 → 用户提问时 Agent 检索原文 → 基于原文回答
+sidebar:
+  order: 2
+  label: 案例 1.2 · PDF RAG 助手
+difficulty: medium
+theme: ai-assistants
+nodes:
+  - Chat Trigger
+  - AI Agent
+  - Vector Store Tool
+  - Pinecone
+  - OpenAI Embeddings
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/pdf-rag-assistant.json';
+
+<span class="editorial-label">第 6 部分 · 案例 1.2 · 🤖 AI 助手</span>
+
+> **难度** 🟡 中等 · **耗时** ~40 分钟 · **核心节点** Vector Store Tool × Pinecone × Embeddings
+
+这是 [5.5 节 RAG 实战](../../05-ai-agents/rag-practice/)的"查询端"完整 workflow。把它跟 5.5 节的"建索引端" workflow 配对就能搭出企业级 PDF 问答助手。
+
+## 🎯 场景
+
+- 公司有一本 200 页员工手册，新人提问总要翻
+- 把手册灌进 Pinecone，做个"手册问答机器人"
+- 跟 [Telegram AI Bot](./telegram-ai-bot/) 结合可以做内部 Slack/Telegram 智能客服
+
+**前置**：先按 [5.5 节 Ingest workflow](../../05-ai-agents/rag-practice/) 把 PDF 切块写入 Pinecone index `my-knowledge-base`。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="pdf-rag-assistant.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={420} />
+</TerminalCell>
+
+注意这是 **3 层挂载**：
+- AI Agent ← Vector Store Tool ← Pinecone ← OpenAI Embeddings
+
+## 📋 关键节点配置
+
+### AI Agent
+
+<TerminalCell filename="agent-config.txt" runTag="⚙">
+{`Prompt:  ={{ $json.chatInput }}
+System Message:
+   你是文档智能助手。必须先用 knowledge_search 工具检索原文，
+   再综合回答。引用时标注 [文档 §X]。
+   找不到就说 "知识库无此内容"，不要捏造。
+Temperature: 0.3   (确保稳定)`}
+</TerminalCell>
+
+### Vector Store Tool（重点）
+
+<TerminalCell filename="vstore-tool.txt" runTag="⚙">
+{`Name:        knowledge_search
+Description: 按用户问题搜索 PDF 知识库，返回最相关的 3 段原文
+
+⚠ Description 是 LLM 决策依据，写不清 Agent 不会调它`}
+</TerminalCell>
+
+### Pinecone (Retrieve)
+
+<TerminalCell filename="pinecone-retrieve.txt" runTag="⚙">
+{`Pinecone Index:  my-knowledge-base
+Top K:           3
+挂载的 Embeddings: OpenAI Embeddings (text-embedding-3-small)
+
+⚠ 必须跟 Ingest 时用的 Embeddings 模型完全一致`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="pdf-rag-assistant.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 检索回来的内容不对">
+  
+  90% 是切块策略问题（[5.5 节调试三层](../../05-ai-agents/rag-practice/)）：
+  
+  1. 先单独运行 Pinecone Retrieve 看 top-3 输出
+  2. 不对 → 调整切块（Chunk Size 500→800、Overlap 50→100）
+  3. 对了但 Agent 还瞎答 → 强化 System Message
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 把 Chat Trigger 换成 Slack Trigger，做团队内 RAG 助手
+  - 加 Memory，让多轮对话能"沿着同一文档问下去"
+  - 多文档源：用 metadata filter 按"手册/产品/FAQ"分路由
+  
+</TipCallout>

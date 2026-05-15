@@ -1,0 +1,85 @@
+{
+  "name": "PDF RAG Assistant",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node-chat-trigger",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "你是文档智能助手。必须先用 knowledge_search 工具检索原文，再回答。引用时标注 [文档 §X]。找不到就说'知识库无此内容'。"
+        }
+      },
+      "id": "node-agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": { "temperature": 0.3 }
+      },
+      "id": "node-llm",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [400, 520]
+    },
+    {
+      "parameters": {
+        "name": "knowledge_search",
+        "description": "按用户问题搜索 PDF 知识库，返回最相关的 3 段原文"
+      },
+      "id": "node-vstore-tool",
+      "name": "Vector Store Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [600, 520]
+    },
+    {
+      "parameters": {
+        "pineconeIndex": { "__rl": true, "value": "my-knowledge-base", "mode": "list" },
+        "topK": 3
+      },
+      "id": "node-pinecone-retrieve",
+      "name": "Pinecone (Retrieve)",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.1,
+      "position": [600, 700]
+    },
+    {
+      "parameters": { "model": "text-embedding-3-small" },
+      "id": "node-emb",
+      "name": "OpenAI Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [600, 880]
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Vector Store Tool": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "Pinecone (Retrieve)": {
+      "ai_vectorStore": [[{ "node": "Vector Store Tool", "type": "ai_vectorStore", "index": 0 }]]
+    },
+    "OpenAI Embeddings": {
+      "ai_embedding": [[{ "node": "Pinecone (Retrieve)", "type": "ai_embedding", "index": 0 }]]
+    }
+  }
+}

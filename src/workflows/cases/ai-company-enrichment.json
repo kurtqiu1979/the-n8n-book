@@ -1,0 +1,90 @@
+{
+  "name": "AI Company Enrichment",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] }
+      },
+      "id": "node-schedule",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "filters": { "conditions": [{ "keyName": "enriched", "condition": "eq", "keyValue": false }] }
+      },
+      "id": "node-airtable-get",
+      "name": "Airtable - Get Leads",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $json.domain }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "node-fetch-website",
+      "name": "Fetch Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.data }}",
+        "options": {
+          "systemMessage": "你是公司情报分析师。从网站 HTML 提取以下 JSON：\n{\n  \"industry\": \"...\",\n  \"size\": \"1-10|11-50|51-200|201-1000|1000+\",\n  \"summary\": \"一句话简介\"\n}\n只回 JSON，不要其他文字。"
+        }
+      },
+      "id": "node-agent",
+      "name": "AI Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": { "temperature": 0, "responseFormat": "json_object" }
+      },
+      "id": "node-llm",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [920, 520]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "id": "={{ $('Airtable - Get Leads').item.json.id }}",
+        "fields": {
+          "values": {
+            "industry": "={{ $json.industry }}",
+            "size": "={{ $json.size }}",
+            "summary": "={{ $json.summary }}",
+            "enriched": true
+          }
+        }
+      },
+      "id": "node-airtable-update",
+      "name": "Airtable - Update",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1160, 300]
+    }
+  ],
+  "connections": {
+    "Schedule": { "main": [[{ "node": "Airtable - Get Leads", "type": "main", "index": 0 }]] },
+    "Airtable - Get Leads": { "main": [[{ "node": "Fetch Website", "type": "main", "index": 0 }]] },
+    "Fetch Website": { "main": [[{ "node": "AI Analyzer", "type": "main", "index": 0 }]] },
+    "OpenAI Chat Model": { "ai_languageModel": [[{ "node": "AI Analyzer", "type": "ai_languageModel", "index": 0 }]] },
+    "AI Analyzer": { "main": [[{ "node": "Airtable - Update", "type": "main", "index": 0 }]] }
+  }
+}

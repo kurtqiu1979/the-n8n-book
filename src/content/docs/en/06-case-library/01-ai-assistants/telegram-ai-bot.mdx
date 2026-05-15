@@ -1,0 +1,96 @@
+---
+title: Telegram AI Chatbot
+description: User messages your Telegram bot → AI Agent replies → remembers multi-turn context per user
+sidebar:
+  order: 1
+  label: Case 1.1 · Telegram AI Bot
+difficulty: easy
+theme: ai-assistants
+nodes:
+  - Telegram Trigger
+  - AI Agent
+  - OpenAI Chat Model
+  - Window Buffer Memory
+  - Telegram
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/telegram-ai-bot.json';
+
+<span class="editorial-label">Part 6 · Case 1.1 · 🤖 AI Assistants</span>
+
+> **Difficulty** 🟢 Easy · **Time** ~15 min · **Core nodes** Telegram Trigger × AI Agent × Memory
+
+Hook OpenAI Chat into Telegram with **5 nodes** and you've got a personal AI assistant with multi-turn memory. The best first AI-automation project — you can chat with it on your phone immediately.
+
+## 🎯 Scenario
+
+- Want a phone-based AI you can chat with anytime, without ChatGPT subscription
+- Make a shared bot for family/friends with per-user memory isolation
+- Use as an "entry-point" sandbox for more complex AI workflows
+
+## 🔍 Workflow diagram
+
+<TerminalCell filename="telegram-ai-bot.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 Key node configs
+
+### Telegram Trigger
+
+Talk to [@BotFather](https://t.me/BotFather) on Telegram to create a bot, get a token, and set up Telegram Credentials in n8n. Then:
+
+<TerminalCell filename="telegram-trigger.txt" runTag="⚙">
+{`Updates: [message]
+Credentials: <your-telegram-bot>`}
+</TerminalCell>
+
+### AI Agent
+
+<TerminalCell filename="ai-agent.txt" runTag="⚙">
+{`Prompt:  ={{ $json.message.text }}
+System Message:
+   You are a friendly AI assistant. Keep responses concise and warm.
+Max Iterations: 5`}
+</TerminalCell>
+
+### Window Buffer Memory (critical!)
+
+<TerminalCell filename="memory.txt" runTag="⚙">
+{`Session Key:            ={{ $('Telegram Trigger').item.json.message.from.id }}
+Context Window Length:  10
+
+⚠ Session Key must be the Telegram user ID for per-user memory isolation`}
+</TerminalCell>
+
+### Send Telegram Reply
+
+<TerminalCell filename="send-reply.txt" runTag="⚙">
+{`Chat ID: ={{ $('Telegram Trigger').item.json.message.chat.id }}
+Text:    ={{ $json.output }}`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="telegram-ai-bot.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+{`\n# Right-click on the canvas → Paste to import`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Session Key mistake causes cross-talk">
+  
+  If Session Key is a fixed string (e.g. "default"), all users share one memory and can read each other's conversations. **Always use dynamic values like `from.id`.**
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Add an HTTP Tool so the bot can fetch weather
+  - Swap Memory for Postgres Chat Memory to survive n8n restarts
+  - Add an IF node: only reply to messages containing specific keywords
+  
+</TipCallout>

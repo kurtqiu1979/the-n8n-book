@@ -1,0 +1,100 @@
+---
+title: PDF RAG Q&A Assistant
+description: Feed PDFs into a vector store → user asks → Agent retrieves chunks → answers from sources
+sidebar:
+  order: 2
+  label: Case 1.2 · PDF RAG Assistant
+difficulty: medium
+theme: ai-assistants
+nodes:
+  - Chat Trigger
+  - AI Agent
+  - Vector Store Tool
+  - Pinecone
+  - OpenAI Embeddings
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/pdf-rag-assistant.json';
+
+<span class="editorial-label">Part 6 · Case 1.2 · 🤖 AI Assistants</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~40 min · **Core nodes** Vector Store Tool × Pinecone × Embeddings
+
+This is the "query" workflow paired with [§5.5 RAG in Practice](../../05-ai-agents/rag-practice/)'s ingest workflow. Combine the two and you have a production PDF Q&A bot.
+
+## 🎯 Scenario
+
+- Company has a 200-page employee handbook; new hires constantly ask "where do I find..."
+- Ingest the handbook into Pinecone, then expose a "handbook Q&A bot"
+- Pair with [Telegram AI Bot](./telegram-ai-bot/) for an internal Slack/Telegram support bot
+
+**Prerequisite:** Run the [§5.5 Ingest workflow](../../05-ai-agents/rag-practice/) first to chunk and write your PDF into Pinecone index `my-knowledge-base`.
+
+## 🔍 Workflow diagram
+
+<TerminalCell filename="pdf-rag-assistant.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={420} />
+</TerminalCell>
+
+Notice the **3 layers of attachment**:
+- AI Agent ← Vector Store Tool ← Pinecone ← OpenAI Embeddings
+
+## 📋 Key node configs
+
+### AI Agent
+
+<TerminalCell filename="agent-config.txt" runTag="⚙">
+{`Prompt:  ={{ $json.chatInput }}
+System Message:
+   You are a document Q&A assistant. You MUST call knowledge_search first,
+   then synthesize. Cite as [Doc §X]. If nothing found, say
+   "Not in the knowledge base" — don't fabricate.
+Temperature: 0.3   (stability)`}
+</TerminalCell>
+
+### Vector Store Tool (key)
+
+<TerminalCell filename="vstore-tool.txt" runTag="⚙">
+{`Name:        knowledge_search
+Description: Search the PDF knowledge base by user question, returns top-3 relevant chunks
+
+⚠ Description drives LLM decisions — write it precisely`}
+</TerminalCell>
+
+### Pinecone (Retrieve)
+
+<TerminalCell filename="pinecone-retrieve.txt" runTag="⚙">
+{`Pinecone Index:  my-knowledge-base
+Top K:           3
+Attached Embeddings: OpenAI Embeddings (text-embedding-3-small)
+
+⚠ Must match the Embeddings model used at Ingest time`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="pdf-rag-assistant.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Retrieved chunks aren't relevant">
+  
+  90% of the time it's a chunking issue ([§5.5 debug ladder](../../05-ai-agents/rag-practice/)):
+  
+  1. Run Pinecone Retrieve alone and inspect top-3 outputs
+  2. Wrong → tune chunking (Chunk Size 500→800, Overlap 50→100)
+  3. Right but Agent still fabricates → strengthen System Message
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Replace Chat Trigger with Slack Trigger for team-internal RAG support
+  - Add Memory so multi-turn conversation can "keep asking about the same doc"
+  - Multi-source: use metadata filter to route between handbook/product/FAQ
+  
+</TipCallout>

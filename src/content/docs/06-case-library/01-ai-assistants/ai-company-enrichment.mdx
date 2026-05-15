@@ -1,0 +1,129 @@
+---
+title: AI 公司情报富化
+description: 给一份"公司名 + 域名"清单，自动抓官网 + AI 提炼行业/规模/简介 → 写回 Airtable
+sidebar:
+  order: 3
+  label: 案例 1.3 · 公司情报富化
+difficulty: medium
+theme: ai-assistants
+nodes:
+  - Schedule Trigger
+  - Airtable
+  - HTTP Request
+  - AI Agent
+  - OpenAI Chat Model
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/ai-company-enrichment.json';
+
+<span class="editorial-label">第 6 部分 · 案例 1.3 · 🤖 AI 助手</span>
+
+> **难度** 🟡 中等 · **耗时** ~30 分钟 · **核心节点** Airtable × HTTP × AI Agent (JSON mode)
+
+销售场景的经典痛点：拿到 200 条潜在客户线索，只有公司名和域名，需要快速分类"哪个值得跟进"。这个 workflow 每 6 小时拉一次未处理线索，自动访问官网、用 AI 提炼行业 / 规模 / 一句话简介，写回 Airtable。
+
+## 🎯 场景
+
+- 销售/营销团队有大量原始 lead 数据，需要快速分类
+- 内容运营批量分析竞品官网
+- 投资人快速浏览一批 startup 的基本面
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="ai-company-enrichment.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+线性 5 步：定时触发 → 查未处理 lead → 抓官网 → AI 提取 → 写回。
+
+## 📋 关键节点配置
+
+### Schedule Trigger
+
+<TerminalCell filename="schedule.txt" runTag="⚙">
+{`Mode:    Every N Hours
+Hours:   6     # 每 6 小时跑一次
+建议先 Manual Trigger 调通后再切到 Schedule`}
+</TerminalCell>
+
+### Airtable - Get Leads
+
+<TerminalCell filename="airtable-get.txt" runTag="⚙">
+{`Resource:   Record
+Operation:  Search
+Table:      leads
+Filters:    enriched = false     # 只取未处理的
+
+输出: 每行一个 item，含 { domain, company_name, id, ... }`}
+</TerminalCell>
+
+### HTTP Request - Fetch Website
+
+<TerminalCell filename="http-fetch.txt" runTag="⚙">
+{`Method:  GET
+URL:     ={{ "https://" + $json.domain }}
+Options:
+  Timeout: 10000     # 10 秒，避免卡死
+  Continue On Fail: ON  # 个别站打不开不影响整体`}
+</TerminalCell>
+
+### AI Analyzer（重点）
+
+<TerminalCell filename="ai-analyzer.txt" runTag="⚙">
+{`Prompt:  ={{ $json.data }}
+System Message:
+  你是公司情报分析师。从网站 HTML 提取以下 JSON：
+  {
+    "industry": "...",
+    "size": "1-10|11-50|51-200|201-1000|1000+",
+    "summary": "一句话简介"
+  }
+  只回 JSON，不要其他文字。
+
+挂载 OpenAI Chat Model:
+  Model:          gpt-4o-mini
+  Temperature:    0
+  Response Format: json_object   ← 强制 JSON 输出`}
+</TerminalCell>
+
+### Airtable - Update
+
+<TerminalCell filename="airtable-update.txt" runTag="⚙">
+{`Operation: Update
+ID:        ={{ $('Airtable - Get Leads').item.json.id }}
+Fields:
+  industry:  ={{ $json.industry }}
+  size:      ={{ $json.size }}
+  summary:   ={{ $json.summary }}
+  enriched:  true                    ← 标记已处理，避免重复跑`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="ai-company-enrichment.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 1 · HTML 太大让 LLM 爆 token">
+  
+  大公司官网 HTML 动辄几百 KB，直接喂 LLM 会超 token 限制。**插一个 HTML Extract 或 Code 节点**先抽出 `<title>` + `<meta description>` + body 前 5000 字。
+  
+</TipCallout>
+
+<TipCallout type="warn" title="坑 2 · AI 返回不是 JSON">
+  
+  确保 OpenAI Chat Model 的 **Response Format = json_object**，否则 LLM 会回带说明文字的 JSON，下游 `$json.industry` 取不到。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 HTTP Tool 让 AI 自主查 LinkedIn / Crunchbase 补充信息
+  - 加 IF 节点：size > 200 的标记为 "High Priority" 推送到 Slack
+  - 把 Airtable 换成 Postgres / Notion / Google Sheets
+  
+</TipCallout>

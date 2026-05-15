@@ -1,0 +1,129 @@
+---
+title: AI Company Intelligence Enrichment
+description: Given a list of "company name + domain", auto-scrape sites + AI extract industry/size/summary → write back to Airtable
+sidebar:
+  order: 3
+  label: Case 1.3 · AI Enrichment
+difficulty: medium
+theme: ai-assistants
+nodes:
+  - Schedule Trigger
+  - Airtable
+  - HTTP Request
+  - AI Agent
+  - OpenAI Chat Model
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/ai-company-enrichment.json';
+
+<span class="editorial-label">Part 6 · Case 1.3 · 🤖 AI Assistants</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~30 min · **Core nodes** Airtable × HTTP × AI Agent (JSON mode)
+
+Classic sales pain: 200 leads with just company name and domain — need to triage "which are worth pursuing." This workflow pulls unprocessed leads every 6 hours, visits each website, uses AI to extract industry / size / one-line summary, and writes back to Airtable.
+
+## 🎯 Scenario
+
+- Sales/marketing teams with raw lead data needing rapid classification
+- Content teams batch-analyzing competitor sites
+- Investors quickly scanning a batch of startups
+
+## 🔍 Workflow diagram
+
+<TerminalCell filename="ai-company-enrichment.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+Linear 5 steps: schedule → fetch unprocessed leads → scrape site → AI extract → write back.
+
+## 📋 Key node configs
+
+### Schedule Trigger
+
+<TerminalCell filename="schedule.txt" runTag="⚙">
+{`Mode:    Every N Hours
+Hours:   6
+Recommend Manual Trigger first to debug, then switch to Schedule.`}
+</TerminalCell>
+
+### Airtable - Get Leads
+
+<TerminalCell filename="airtable-get.txt" runTag="⚙">
+{`Resource:   Record
+Operation:  Search
+Table:      leads
+Filters:    enriched = false
+
+Output: one item per row, with { domain, company_name, id, ... }`}
+</TerminalCell>
+
+### HTTP Request - Fetch Website
+
+<TerminalCell filename="http-fetch.txt" runTag="⚙">
+{`Method:  GET
+URL:     ={{ "https://" + $json.domain }}
+Options:
+  Timeout: 10000     # 10s, prevent stalls
+  Continue On Fail: ON  # one dead site shouldn't halt the batch`}
+</TerminalCell>
+
+### AI Analyzer (key)
+
+<TerminalCell filename="ai-analyzer.txt" runTag="⚙">
+{`Prompt:  ={{ $json.data }}
+System Message:
+  You are a company intelligence analyst. Extract this JSON from the HTML:
+  {
+    "industry": "...",
+    "size": "1-10|11-50|51-200|201-1000|1000+",
+    "summary": "one-line summary"
+  }
+  Return ONLY JSON, no other text.
+
+Attached OpenAI Chat Model:
+  Model:          gpt-4o-mini
+  Temperature:    0
+  Response Format: json_object   ← force JSON output`}
+</TerminalCell>
+
+### Airtable - Update
+
+<TerminalCell filename="airtable-update.txt" runTag="⚙">
+{`Operation: Update
+ID:        ={{ $('Airtable - Get Leads').item.json.id }}
+Fields:
+  industry:  ={{ $json.industry }}
+  size:      ={{ $json.size }}
+  summary:   ={{ $json.summary }}
+  enriched:  true                    ← mark done; avoid re-processing`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="ai-company-enrichment.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap 1 · HTML too large, blows LLM's token budget">
+  
+  Big company sites can have hundreds of KB of HTML. Insert an HTML Extract or Code node first to grab `<title>` + `<meta description>` + first 5000 chars of body before feeding the LLM.
+  
+</TipCallout>
+
+<TipCallout type="warn" title="Trap 2 · AI returns non-JSON">
+  
+  Make sure OpenAI Chat Model's **Response Format = json_object**, otherwise the LLM might prepend explanatory text and `$json.industry` won't parse.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Add HTTP Tools so the AI can autonomously query LinkedIn / Crunchbase
+  - Add IF node: size > 200 → mark "High Priority" → push to Slack
+  - Swap Airtable for Postgres / Notion / Google Sheets
+  
+</TipCallout>
