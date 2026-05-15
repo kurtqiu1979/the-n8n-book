@@ -1,0 +1,81 @@
+{
+  "name": "API Polling & Event Router",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] } },
+      "id": "node-schedule",
+      "name": "Every 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": { "url": "https://api.example.com/events?since=last_poll", "options": {} },
+      "id": "node-fetch",
+      "name": "Fetch Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": { "fieldToSplitOut": "events", "options": {} },
+      "id": "node-split",
+      "name": "Split Events",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "outputKey": "user.created", "conditions": { "conditions": [{ "leftValue": "={{ $json.type }}", "rightValue": "user.created" }] } },
+            { "outputKey": "order.placed", "conditions": { "conditions": [{ "leftValue": "={{ $json.type }}", "rightValue": "order.placed" }] } },
+            { "outputKey": "subscription.cancelled", "conditions": { "conditions": [{ "leftValue": "={{ $json.type }}", "rightValue": "subscription.cancelled" }] } }
+          ]
+        }
+      },
+      "id": "node-switch",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": { "channel": "#new-users", "text": "=👤 New user: {{ $json.payload.email }}" },
+      "id": "node-slack-1",
+      "name": "Slack #new-users",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [1180, 180]
+    },
+    {
+      "parameters": { "channel": "#orders", "text": "=🛒 Order: ${{ $json.payload.amount }}" },
+      "id": "node-slack-2",
+      "name": "Slack #orders",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": { "channel": "#churn-alerts", "text": "=⚠ Churn: {{ $json.payload.user_email }}" },
+      "id": "node-slack-3",
+      "name": "Slack #churn",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [1180, 420]
+    }
+  ],
+  "connections": {
+    "Every 5 min": { "main": [[{ "node": "Fetch Events", "type": "main", "index": 0 }]] },
+    "Fetch Events": { "main": [[{ "node": "Split Events", "type": "main", "index": 0 }]] },
+    "Split Events": { "main": [[{ "node": "Route by Event Type", "type": "main", "index": 0 }]] },
+    "Route by Event Type": {
+      "main": [
+        [{ "node": "Slack #new-users", "type": "main", "index": 0 }],
+        [{ "node": "Slack #orders", "type": "main", "index": 0 }],
+        [{ "node": "Slack #churn", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}

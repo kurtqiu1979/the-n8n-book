@@ -1,0 +1,79 @@
+---
+title: CSV → Database Pipeline
+description: New CSV in Google Drive → parse → per-row validation → insert valid rows + email alert on bad ones
+sidebar:
+  order: 1
+  label: Case 5.1 · CSV → DB
+difficulty: medium
+theme: data-pipeline
+nodes:
+  - Google Drive Trigger
+  - Extract from File
+  - IF
+  - Postgres
+  - Email Send
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/csv-to-database.json';
+
+<span class="editorial-label">Part 6 · Case 5.1 · 🔄 Data Pipeline</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~25 min · **Core nodes** GDrive Trigger × Extract × IF × Postgres
+
+Ops dumps a 5000-row CSV: "import this." Direct import fails on half (dirty data); manual cleaning is tedious. This workflow watches a Drive folder, **parses new CSVs, validates per row, inserts good rows, emails bad ones for fixing**.
+
+## 🔍 Workflow
+
+<TerminalCell filename="csv-to-database.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`GDrive New CSV (Trigger):
+  Event:    fileCreated
+  Folder:   <watched Drive folder>
+  File Type: csv
+
+Extract from File:
+  Operation: CSV
+  → one item per row
+
+Validate Row (IF):
+  Email regex: ^[\\w.-]+@[\\w.-]+\\.\\w+$
+  → True branch = insert; False branch = alert
+
+Insert Postgres:
+  Operation: Insert
+  Table:     customers
+  Columns:   email, name, signup_date
+
+Alert Bad Rows:
+  Subject: Invalid rows in CSV import
+  Text:    ={{ JSON.stringify($json) }}`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="csv-to-database.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Re-import duplicates">
+  
+  Re-uploading the same file fires again. Either pre-check with SELECT or use Postgres `ON CONFLICT DO NOTHING` (UPSERT mode).
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - AI Vision node for image-style CSVs (screenshots)
+  - Bad rows → separate "to-fix" table
+  - SplitInBatches to rate-limit INSERTs, prevent DB overload
+  
+</TipCallout>

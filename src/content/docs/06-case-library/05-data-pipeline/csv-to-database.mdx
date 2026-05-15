@@ -1,0 +1,79 @@
+---
+title: CSV → 数据库 数据管道
+description: Google Drive 新 CSV → 解析 → 行级验证 → 合法行入库 + 错误行邮件告警
+sidebar:
+  order: 1
+  label: 案例 5.1 · CSV → DB
+difficulty: medium
+theme: data-pipeline
+nodes:
+  - Google Drive Trigger
+  - Extract from File
+  - IF
+  - Postgres
+  - Email Send
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/csv-to-database.json';
+
+<span class="editorial-label">第 6 部分 · 案例 5.1 · 🔄 数据管道</span>
+
+> **难度** 🟡 中等 · **耗时** ~25 分钟 · **核心节点** GDrive Trigger × Extract × IF × Postgres
+
+业务部门给你扔了 5000 行 CSV，让"导进数据库"。直接 import 失败一半（脏数据），手动清洗又烦——这个 workflow 自动监控指定 Drive 文件夹，**新 CSV 来就解析、逐行验证、合法入库、问题行单独邮件告警**。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="csv-to-database.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`GDrive New CSV (Trigger):
+  Event:    fileCreated
+  Folder:   <监控的 Drive 文件夹>
+  File Type: csv
+
+Extract from File:
+  Operation: CSV
+  → 输出每行一个 item
+
+Validate Row (IF):
+  邮箱合法 regex: ^[\\w.-]+@[\\w.-]+\\.\\w+$
+  → True 路径 = 入库, False 路径 = 报错
+
+Insert Postgres:
+  Operation: Insert
+  Table:     customers
+  Columns:   email, name, signup_date
+
+Alert Bad Rows:
+  Subject: Invalid rows in CSV import
+  Text:    ={{ JSON.stringify($json) }}`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="csv-to-database.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 重复导入">
+  
+  同一个文件 reupload 会再次触发。要么在 Insert 前用 SELECT 检查、要么用 Postgres 的 `ON CONFLICT DO NOTHING`（UPSERT 模式）。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 AI 节点用 Vision 解析图片型 CSV（截图）
+  - 错误行单独建一个"待修复"表
+  - 加 SplitInBatches 控制速率，避免 INSERT 把数据库打爆
+  
+</TipCallout>

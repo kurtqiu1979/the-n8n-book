@@ -1,0 +1,82 @@
+{
+  "name": "Multi-Source Dedup & Merge",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] } },
+      "id": "node-schedule",
+      "name": "Hourly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 400]
+    },
+    {
+      "parameters": { "operation": "getRows", "documentId": "<SHEETS_ID>", "sheetName": "leads" },
+      "id": "node-sheets",
+      "name": "Source A · Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [400, 200]
+    },
+    {
+      "parameters": { "url": "https://api.crm.com/leads", "options": {} },
+      "id": "node-api",
+      "name": "Source B · CRM API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 400]
+    },
+    {
+      "parameters": { "operation": "executeQuery", "query": "SELECT email, name, phone FROM legacy_leads" },
+      "id": "node-pg",
+      "name": "Source C · Legacy DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [400, 600]
+    },
+    {
+      "parameters": { "mode": "combine", "combineBy": "combineAll" },
+      "id": "node-merge",
+      "name": "Merge All Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 按 email 去重，后到的覆盖先到的\nconst seen = new Map();\nfor (const item of $input.all()) {\n  const email = (item.json.email || '').toLowerCase().trim();\n  if (email) seen.set(email, item.json);\n}\nreturn Array.from(seen.values()).map(json => ({ json }));"
+      },
+      "id": "node-dedup",
+      "name": "Dedup by Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "table": "unified_leads",
+        "columns": "email,name,phone",
+        "additionalFields": {}
+      },
+      "id": "node-upsert",
+      "name": "Upsert to Master",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1140, 400]
+    }
+  ],
+  "connections": {
+    "Hourly": {
+      "main": [[
+        { "node": "Source A · Sheets", "type": "main", "index": 0 },
+        { "node": "Source B · CRM API", "type": "main", "index": 0 },
+        { "node": "Source C · Legacy DB", "type": "main", "index": 0 }
+      ]]
+    },
+    "Source A · Sheets": { "main": [[{ "node": "Merge All Sources", "type": "main", "index": 0 }]] },
+    "Source B · CRM API": { "main": [[{ "node": "Merge All Sources", "type": "main", "index": 1 }]] },
+    "Source C · Legacy DB": { "main": [[{ "node": "Merge All Sources", "type": "main", "index": 2 }]] },
+    "Merge All Sources": { "main": [[{ "node": "Dedup by Email", "type": "main", "index": 0 }]] },
+    "Dedup by Email": { "main": [[{ "node": "Upsert to Master", "type": "main", "index": 0 }]] }
+  }
+}

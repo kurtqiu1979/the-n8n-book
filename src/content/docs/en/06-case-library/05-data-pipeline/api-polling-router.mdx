@@ -1,0 +1,76 @@
+---
+title: API Polling & Event Router
+description: Poll API every 5 min → split events → route by type to different Slack channels
+sidebar:
+  order: 2
+  label: Case 5.2 · API Polling Router
+difficulty: medium
+theme: data-pipeline
+nodes:
+  - Schedule Trigger
+  - HTTP Request
+  - Split Out
+  - Switch
+  - Slack
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/api-polling-router.json';
+
+<span class="editorial-label">Part 6 · Case 5.2 · 🔄 Data Pipeline</span>
+
+> **Difficulty** 🟡 Medium · **Time** ~25 min · **Core nodes** Schedule × Split Out × Switch
+
+Legacy third-party system **without webhooks**? Polling is your only option. This workflow demonstrates the standard "poll every 5 min + route events" pattern — fetch a batch of new events, route by `type` to different Slack channels.
+
+## 🔍 Workflow
+
+<TerminalCell filename="api-polling-router.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={400} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Every 5 min (Schedule):
+  Mode: Every N Minutes
+  Minutes: 5
+
+Fetch Events:
+  GET https://api.example.com/events?since=last_poll
+  Returns { events: [{ type, payload }, ...] }
+
+Split Events:
+  Field: events
+  → array → N items
+
+Route by Event Type (Switch):
+  Output 0: type = "user.created"
+  Output 1: type = "order.placed"
+  Output 2: type = "subscription.cancelled"
+
+Three Slack nodes connect to the three Switch outputs`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="api-polling-router.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Without `since` you re-process forever">
+  
+  Always-from-zero is disastrous. Need incremental: either API supports `?since=` or store `last_seen_id` yourself in Postgres / Static Data.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Refactor into a generic "event source router" sub-workflow
+  - Add IF: only push during business hours, silent at night
+  - Replace Switch with an AI Agent that decides importance from content
+  
+</TipCallout>

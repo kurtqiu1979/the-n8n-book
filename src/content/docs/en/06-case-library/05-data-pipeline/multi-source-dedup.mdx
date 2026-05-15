@@ -1,0 +1,81 @@
+---
+title: Multi-Source Dedup & Merge
+description: 3 sources (Sheets + API + legacy DB) → Merge → Code dedup by email → Upsert master table
+sidebar:
+  order: 3
+  label: Case 5.3 · Multi-Source Dedup
+difficulty: hard
+theme: data-pipeline
+nodes:
+  - Schedule Trigger
+  - Google Sheets
+  - HTTP Request
+  - Postgres
+  - Merge
+  - Code
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/multi-source-dedup.json';
+
+<span class="editorial-label">Part 6 · Case 5.3 · 🔄 Data Pipeline</span>
+
+> **Difficulty** 🔴 Hard · **Time** ~45 min · **Core nodes** 3 Sources × Merge × Code dedup
+
+Classic "customer data scattered everywhere": sales tracks in Sheets, users in CRM API, legacy users in a 5-year-old Postgres. This workflow runs hourly, **dedups by email and merges into a unified master table** — basis for a "Customer 360."
+
+## 🔍 Workflow
+
+<TerminalCell filename="multi-source-dedup.workflow.json" level="Lv.3" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={400} />
+</TerminalCell>
+
+## 📋 Key configs
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Three sources:
+  - Source A: Google Sheets "leads"
+  - Source B: HTTP GET https://api.crm.com/leads
+  - Source C: Postgres "SELECT email, name, phone FROM legacy_leads"
+
+Merge All Sources:
+  Mode: Combine → All (stack)
+  Three input ports take A/B/C
+
+Dedup by Email (Code node):
+  // dedup by email, latest overwrites
+  const seen = new Map();
+  for (const item of $input.all()) {
+    const email = (item.json.email || '').toLowerCase().trim();
+    if (email) seen.set(email, item.json);
+  }
+  return Array.from(seen.values()).map(json => ({ json }));
+
+Upsert to Master:
+  Operation: Upsert
+  Table:     unified_leads
+  Columns:   email, name, phone`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="multi-source-dedup.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Field names/types differ across sources">
+  
+  Three sources have different field names (`Email` / `email_address` / `mail`) and types (string / null / with whitespace). **Before** Merge, use a Set node to normalize each source to `{ email, name, phone }`.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Conflict handling: when names differ, which to keep? IF + strategy (by recency / by source priority)
+  - Slack summary: "merged X rows, +Y new, ~Z updated"
+  - Performance: stream Source C with PG cursor instead of full-table load
+  
+</TipCallout>

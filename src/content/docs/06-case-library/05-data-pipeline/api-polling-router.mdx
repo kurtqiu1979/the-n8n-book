@@ -1,0 +1,76 @@
+---
+title: API 轮询事件路由
+description: 每 5 分钟轮询 API → Split 事件数组 → Switch 按事件类型分发到 Slack
+sidebar:
+  order: 2
+  label: 案例 5.2 · API 轮询路由
+difficulty: medium
+theme: data-pipeline
+nodes:
+  - Schedule Trigger
+  - HTTP Request
+  - Split Out
+  - Switch
+  - Slack
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/api-polling-router.json';
+
+<span class="editorial-label">第 6 部分 · 案例 5.2 · 🔄 数据管道</span>
+
+> **难度** 🟡 中等 · **耗时** ~25 分钟 · **核心节点** Schedule × Split Out × Switch
+
+老旧第三方系统**没 Webhook**？只能轮询。这个 workflow 演示了"**5 分钟轮询 + 事件路由**"的标准套路——拉一批新事件后按 `type` 字段分发到不同 Slack 频道。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="api-polling-router.workflow.json" level="Lv.2" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={400} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`Every 5 min (Schedule):
+  Mode: Every N Minutes
+  Minutes: 5
+
+Fetch Events:
+  GET https://api.example.com/events?since=last_poll
+  返回 { events: [{ type, payload }, ...] }
+
+Split Events:
+  Field: events
+  → 把数组拆成 N 个 items
+
+Route by Event Type (Switch):
+  Output 0: type = "user.created"
+  Output 1: type = "order.placed"
+  Output 2: type = "subscription.cancelled"
+
+3 个 Slack 节点分别接 Switch 的 3 个输出口`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="api-polling-router.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 没有 since 参数会重复处理">
+  
+  每次都从头拉是灾难性的。必须支持"增量"：要么 API 提供 `?since=` 参数，要么自己存 last_seen_id 到 Postgres / Static Data。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 用 Wait + Sub-workflow 改造成"事件来源 API"的通用路由器
+  - 加 IF：只在工作时间段 push 通知，深夜静默
+  - 把 Switch 换成 AI Agent，让它根据事件内容自主判断重要度
+  
+</TipCallout>

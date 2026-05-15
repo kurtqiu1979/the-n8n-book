@@ -1,0 +1,80 @@
+{
+  "name": "CSV to Database Pipeline",
+  "nodes": [
+    {
+      "parameters": { "event": "fileCreated", "folderId": "<DRIVE_FOLDER>", "options": { "fileType": "csv" } },
+      "id": "node-drive-trigger",
+      "name": "GDrive New CSV",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": { "operation": "download", "fileId": "={{ $json.id }}" },
+      "id": "node-download",
+      "name": "Download File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": { "operation": "csv", "options": {} },
+      "id": "node-parse",
+      "name": "Parse CSV",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            { "leftValue": "={{ $json.email }}", "operator": { "type": "string", "operation": "regex" }, "rightValue": "^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$" }
+          ]
+        }
+      },
+      "id": "node-validate",
+      "name": "Validate Row",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "customers",
+        "columns": "email,name,signup_date",
+        "additionalFields": {}
+      },
+      "id": "node-pg",
+      "name": "Insert Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1140, 220]
+    },
+    {
+      "parameters": {
+        "fromEmail": "data@example.com",
+        "toEmail": "admin@example.com",
+        "subject": "=Invalid rows in CSV import",
+        "text": "=Bad row: {{ JSON.stringify($json) }}"
+      },
+      "id": "node-alert",
+      "name": "Alert Bad Rows",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1140, 400]
+    }
+  ],
+  "connections": {
+    "GDrive New CSV": { "main": [[{ "node": "Download File", "type": "main", "index": 0 }]] },
+    "Download File": { "main": [[{ "node": "Parse CSV", "type": "main", "index": 0 }]] },
+    "Parse CSV": { "main": [[{ "node": "Validate Row", "type": "main", "index": 0 }]] },
+    "Validate Row": {
+      "main": [
+        [{ "node": "Insert Postgres", "type": "main", "index": 0 }],
+        [{ "node": "Alert Bad Rows", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}

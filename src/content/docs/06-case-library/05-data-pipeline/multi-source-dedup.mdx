@@ -1,0 +1,81 @@
+---
+title: 多源数据去重合并
+description: 3 个来源（Sheets + API + 老 DB）→ Merge → Code 按 email 去重 → Upsert 主表
+sidebar:
+  order: 3
+  label: 案例 5.3 · 多源去重
+difficulty: hard
+theme: data-pipeline
+nodes:
+  - Schedule Trigger
+  - Google Sheets
+  - HTTP Request
+  - Postgres
+  - Merge
+  - Code
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/multi-source-dedup.json';
+
+<span class="editorial-label">第 6 部分 · 案例 5.3 · 🔄 数据管道</span>
+
+> **难度** 🔴 困难 · **耗时** ~45 分钟 · **核心节点** 三 Source × Merge × Code 去重
+
+经典的"客户数据散落各地"问题：销售记在 Sheets、用户在 CRM API、老用户在 5 年前的 Postgres DB。这个 workflow 每小时拉一遍，**按 email 去重合并到一张主表**——成为"客户 360" 的基础。
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="multi-source-dedup.workflow.json" level="Lv.3" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={400} />
+</TerminalCell>
+
+## 📋 关键节点
+
+<TerminalCell filename="key-config.txt" runTag="⚙">
+{`三个数据源:
+  - Source A: Google Sheets "leads"
+  - Source B: HTTP GET https://api.crm.com/leads
+  - Source C: Postgres "SELECT email, name, phone FROM legacy_leads"
+
+Merge All Sources:
+  Mode: Combine → All（拼到一起）
+  3 个输入口分别接 A/B/C
+
+Dedup by Email (Code 节点):
+  // 按 email 去重，后到的覆盖
+  const seen = new Map();
+  for (const item of $input.all()) {
+    const email = (item.json.email || '').toLowerCase().trim();
+    if (email) seen.set(email, item.json);
+  }
+  return Array.from(seen.values()).map(json => ({ json }));
+
+Upsert to Master:
+  Operation: Upsert
+  Table:     unified_leads
+  Columns:   email, name, phone`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="multi-source-dedup.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · 字段名/字段类型不一致">
+  
+  三个源的字段名不一样（`Email` / `email_address` / `mail`）和类型不一样（string / null / 含空格）。在 Merge **之前**用 Set 节点统一塑形——每个源都映射到 `{ email, name, phone }`。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - "数据冲突"处理：name 不一致时保留哪个？用 IF 加策略（按数据新鲜度 / 来源权重）
+  - 加 Slack 通知：每次跑完总结"本次合并 X 条，新增 Y，更新 Z"
+  - Performance：源 C 用流式读取（用 PG Cursor 而非全表加载）
+  
+</TipCallout>
