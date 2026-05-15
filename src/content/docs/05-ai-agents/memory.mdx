@@ -1,0 +1,196 @@
+---
+title: Memory · 让 Agent 记得上次说啥
+description: Window Buffer / Summary Buffer / Postgres Chat Memory —— 三种记忆模式怎么选
+sidebar:
+  order: 4
+  label: 5.3 Memory
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 5 章 · 第 3 节</span>
+
+默认情况下，Agent 是"金鱼脑"——每次对话独立，不记得 5 秒前你说了啥。要让它"记得"，挂一个 **Memory** 子节点就行。这一节讲三种主流 Memory 类型，以及"什么时候该挂哪个"。
+
+## 没 Memory 的对话长这样
+
+<TerminalCell filename="no-memory.txt" runTag="🐟">
+{`用户：我叫 Alice。
+Agent：你好 Alice，有什么我可以帮你的？
+
+用户：刚才我告诉你我叫什么？
+Agent：抱歉，我不知道你的名字。
+
+  ↑ 没挂 Memory，每次都是新对话`}
+</TerminalCell>
+
+挂上 Window Buffer Memory 后：
+
+<TerminalCell filename="with-memory.txt" runTag="🧠">
+{`用户：我叫 Alice。
+Agent：你好 Alice，有什么我可以帮你的？
+
+用户：刚才我告诉你我叫什么？
+Agent：你刚才说你叫 Alice。
+
+  ↑ 因为有 Memory，上一轮对话被自动注入到这次推理的上下文里`}
+</TerminalCell>
+
+## 三种 Memory 节点
+
+### ① Window Buffer Memory（最常用）
+
+保留**最近 N 轮**对话——超出就丢掉旧的。
+
+<TerminalCell filename="window-buffer.txt" runTag="📦">
+{`配置：
+  Session Key:           ={{ $json.sessionId }}    用户标识，区分会话
+  Context Window Length: 5                          保留最近 5 轮
+
+行为：
+  对话 1-5：全部记得
+  对话 6 来了：忘掉对话 1，记 2-6
+  对话 7 来了：忘掉对话 2，记 3-7
+  
+适合：短对话场景（客服、问答），不在意远古对话。`}
+</TerminalCell>
+
+### ② Summary Buffer Memory（长对话省 token）
+
+保留**摘要 + 最近几轮**。LLM 自动把"老对话"压缩成摘要，新对话保持原样。
+
+<TerminalCell filename="summary-buffer.txt" runTag="📝">
+{`配置：
+  Session Key:           ={{ $json.sessionId }}
+  Max Token Limit:       2000          摘要 + 最近对话总 token 数上限
+
+行为：
+  对话 1-10：占用 1800 token，原样保留
+  对话 11 来了：超 2000 → 自动调 LLM 总结对话 1-5，变成 200 token 的摘要
+  接下来：摘要(200) + 对话 6-11(剩余) → 总量回到 2000 以内
+
+适合：长对话、客服多轮排障、追剧式聊天，你不想让最久远的内容彻底丢。`}
+</TerminalCell>
+
+**注意**：摘要本身要花一次 LLM 调用，**比 Window Buffer 贵一点**。
+
+### ③ Postgres / Redis Chat Memory（持久化）
+
+Window/Summary Buffer 默认存内存——**workflow 重启就丢**。要让"用户一周后回来还能续上"，需要把记忆存到数据库：
+
+<TerminalCell filename="postgres-memory.txt" runTag="🗄">
+{`配置：
+  Session Key:           ={{ $json.userId }}     每个用户独立
+  Table Name:            chat_history             Postgres 里的表名
+  Credential:            <Postgres connection>
+
+行为：
+  每次 Agent 跑完，把对话历史 INSERT 到 chat_history
+  新会话开始，按 session_key 查最近 N 条
+  
+适合：跨会话延续的真实产品（聊天助手 SaaS、AI 角色扮演）。`}
+</TerminalCell>
+
+Redis 版本类似——更适合短期、高频访问、不需要持久。
+
+## 关键参数：Session Key
+
+**每个 Memory 都必须有 Session Key**——它是"这是谁的对话"的标识：
+
+<TerminalCell filename="session-key-examples.txt" runTag="🔑">
+{`Telegram bot:
+  Session Key: ={{ $json.message.from.id }}     用 Telegram 用户 ID
+
+Slack bot:
+  Session Key: ={{ $json.user }}                Slack user ID
+
+Web chat:
+  Session Key: ={{ $json.userId }}              你前端传的用户 id
+
+测试期间：
+  Session Key: test-session                     固定字符串，所有对话共享
+
+❌ 千万别这么写：
+  Session Key: 不填 / 留空
+  → 所有用户共享同一份记忆！会串台！`}
+</TerminalCell>
+
+## 三种 Memory 决策树
+
+<TerminalCell filename="memory-decision.txt" runTag="🌳">
+{`Q1: 这是单次问答还是多轮对话？
+    
+    [单次问答 - 用户提一个问题就走] ─→ 不挂 Memory
+    
+    [多轮对话] → Q2
+
+Q2: 对话长度大概多长？
+    
+    [< 10 轮的短对话] ──────────→ Window Buffer Memory
+    
+    [可能很长的对话] ───────────→ Summary Buffer Memory
+
+Q3: 用户回来还要续上之前的吗？
+    
+    [否，刷新就清] ──────────────→ 用上面的内存版
+    
+    [是，跨会话/设备续上] ───────→ Postgres / Redis Chat Memory`}
+</TerminalCell>
+
+## 实战：给 Telegram Bot 加记忆
+
+<TerminalCell filename="telegram-with-memory.txt" runTag="💬">
+{`Workflow:
+
+[Telegram Trigger]
+     ↓
+[AI Agent]
+   Chat Model:  [OpenAI Chat Model]
+   Memory:      [Postgres Chat Memory]
+                  Session Key: ={{ $json.message.from.id }}
+                  Table: telegram_chat_history
+   Tool:        ... (按需)
+     ↓
+[Telegram - Send Message]
+   Chat ID: ={{ $('Telegram Trigger').item.json.message.chat.id }}
+   Text:    ={{ $json.output }}
+
+结果：每个 Telegram 用户有独立、持久的对话记忆，重启 n8n 也不丢。`}
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 1 · Session Key 写错导致用户串台">
+  
+  最常见的事故。两个用户都用同一个 Session Key（比如忘记动态注入用了 fixed string）→ Agent 误以为他们是同一个人 → 对话上下文混乱、个人信息泄漏。
+  
+  **解药**：上线前**至少测两个不同用户**，确认 Session Key 真的是动态的。
+  
+</TipCallout>
+
+<TipCallout type="warn" title="坑 2 · Memory 跟 token 上限的拉锯">
+  
+  对话越长 → Memory 注入的内容越多 → 单次推理 token 越多 → 越贵越慢。
+  
+  **解药**：监控 token 用量；Window Length 别贪心（5-10 通常够）；超长场景果断换 Summary Buffer。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  把上面那个"天气小助手 Agent"（5.2 节）加上 Window Buffer Memory（length=5）。然后这么聊：
+  
+  1. "上海今天天气如何？" → Agent 应该调工具查天气
+  2. "那明天呢？" → 看 Agent 是不是知道你在问"上海明天"——证明它记得上下文
+  
+</TipCallout>
+
+## 本节要点回顾
+
+- 默认 Agent 没记忆 —— 挂 Memory 子节点才行
+- **Window Buffer**：最近 N 轮（最常用）
+- **Summary Buffer**：摘要 + 最近几轮（长对话省 token）
+- **Postgres / Redis Chat Memory**：跨会话持久化
+- **Session Key 必填且必动态**——错了会串台
+- 别贪心 Window Length，监控 token 成本
+
+下一节[Vector Store + Embedding](../vector-stores/)——给 Agent 装"长期记忆"。

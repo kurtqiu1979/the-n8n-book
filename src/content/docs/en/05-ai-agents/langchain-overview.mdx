@@ -1,0 +1,174 @@
+---
+title: LangChain Nodes Overview · 70+ AI Nodes by Role
+description: n8n's built-in LangChain nodes split into 5 roles — Model / Agent / Memory / Tool / Vector
+sidebar:
+  order: 2
+  label: 5.1 LangChain Overview
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 5 · Section 1</span>
+
+Since n8n 1.x, [LangChain](https://js.langchain.com/) is integrated, providing 70+ AI-related nodes. The list looks overwhelming — but they're all just **5 roles**. Understand the roles, and assembling AI workflows feels like Lego.
+
+## The 5 roles
+
+<TerminalCell filename="langchain-roles.txt" runTag="🎭">
+{`① Chat Model              "Brain" — the actual LLM
+   OpenAI Chat Model · Anthropic Chat Model · Ollama · Google Gemini · etc.
+
+② Agent                   "Decision center" — coordinates LLM and tools
+   AI Agent · Tools Agent · Conversational Agent
+
+③ Memory                  "Short-term memory" — multi-turn context
+   Window Buffer Memory · Summary Buffer Memory · Postgres Chat Memory · etc.
+
+④ Tool                    "Hands" — capabilities the Agent can invoke
+   HTTP Request Tool · Code Tool · Calculator · Wikipedia · Custom Tool · etc.
+
+⑤ Vector Store            "Long-term memory" — for RAG retrieval
+   Pinecone · Qdrant · Supabase · Postgres · In-Memory · etc.
+
+Helpers:
+  - Embeddings: turn text into vectors for Vector Store
+  - Text Splitter: chunk long documents
+  - Document Loader: ingest from PDF/URL`}
+</TerminalCell>
+
+## Root + Sub node connection pattern
+
+LangChain nodes connect differently from regular nodes — using a **"main node + attached sub-nodes"** pattern:
+
+<TerminalCell filename="root-sub.txt" runTag="🔗">
+{`         ┌─────────────────────┐
+in    ─▶│   AI Agent          │─▶ out
+        │   (Root Node)       │
+        │                     │
+        │  Chat Model ◀──── [OpenAI Chat Model]    (Sub Node)
+        │  Memory     ◀──── [Window Buffer]        (Sub Node)
+        │  Tool       ◀──── [HTTP Request Tool]    (Sub Node)
+        │  Tool       ◀──── [Wikipedia Tool]       (Sub Node)
+        └─────────────────────┘
+
+Root: AI Agent — handles I/O
+Sub: connects to root via bottom ports — provides capabilities`}
+</TerminalCell>
+
+Each port accepts a specific sub-node type (Chat Model port only takes Chat Model class).
+
+## ① Chat Model — which LLM
+
+| Node | Source | Typical use |
+|---|---|---|
+| **OpenAI Chat Model** | OpenAI API (GPT-4o / GPT-4.1 / o-series) | Strongest overall, pricey |
+| **Anthropic Chat Model** | Claude API (Sonnet / Opus / Haiku) | Long context + writing |
+| **Google Gemini Chat Model** | Gemini API | Cost-effective, multimodal |
+| **Ollama Chat Model** | Local Ollama | Free, privacy-sensitive data |
+| **Groq Chat Model** | Groq Cloud | Ultra-fast inference |
+| **Mistral / DeepSeek / etc.** | Various APIs | Depends on need |
+
+<TerminalCell filename="chat-model-config.txt" runTag="⚙">
+{`OpenAI Chat Model:
+  Model:        gpt-4o-mini   (cheap) / gpt-4.1 (capable)
+  Temperature:  0.7           (0=deterministic, 1=creative)
+  Max Tokens:   2000          (output cap)
+  Credential:   <OpenAI API key>`}
+</TerminalCell>
+
+## ② Agent — which orchestrator
+
+| Agent Node | For |
+|---|---|
+| **AI Agent** (recommended default) | General — LLM decides which tool to call |
+| **Tools Agent** | Heavy tool-calling scenarios |
+| **Conversational Agent** | Multi-turn dialogue focus |
+
+90% of cases use **AI Agent**.
+
+## ③ Memory — should it remember?
+
+| Memory Node | When |
+|---|---|
+| **Window Buffer Memory** | Keep last N turns (simplest) |
+| **Summary Buffer Memory** | Summary + recent turns (long dialogues, save tokens) |
+| **Postgres Chat Memory** | Persistent across sessions (user returns 7 days later, resumes) |
+| **Redis Chat Memory** | Same but with Redis |
+| (no Memory) | Each conversation independent (Q&A scenarios) |
+
+## ④ Tool — give the Agent "hands"
+
+Tool nodes let the Agent **do things** — call APIs, do math, query Wikipedia, invoke your custom workflows…
+
+<TerminalCell filename="tool-types.txt" runTag="🛠">
+{`Built-in tools:
+  - HTTP Request Tool       any API call
+  - Code Tool               JS code execution
+  - Calculator              math
+  - Wikipedia               Wikipedia lookup
+  - SerpAPI                 Google search
+  - Vector Store Tool       retrieve from your knowledge base (RAG)
+
+Use existing workflows as tools:
+  - Workflow Tool           call another n8n workflow
+
+Use app nodes as tools (most powerful):
+  - Slack node, Notion node ... almost any app node can be attached as a Tool`}
+</TerminalCell>
+
+When attaching, you give each tool a **name + description of when to use it** — the LLM reads this to decide invocation.
+
+## ⑤ Vector Store — long-term memory / RAG
+
+Turn documents (PDFs, web pages, Notion pages) into a **searchable knowledge base** for the Agent. Deep dive in §5.4.
+
+<TerminalCell filename="vector-flow.txt" runTag="📚">
+{`Flow:
+  PDF/docs → [Document Loader] → [Text Splitter] → [Embeddings] → [Vector Store]
+                                                       (to vectors)
+  Question ─→ [Embeddings] → [Vector Store search top-K]
+                                       ↓
+                                       relevant chunks
+                                       ↓
+                                   AI Agent (uses chunks as context)`}
+</TerminalCell>
+
+## A minimal Agent canvas
+
+<TerminalCell filename="minimal-agent-canvas.txt" runTag="🎯">
+{`[Chat Trigger]
+     ↓
+[AI Agent]
+     ├── Chat Model:  [OpenAI Chat Model]
+     ├── Memory:      [Window Buffer Memory]
+     └── Tool:        [Wikipedia Tool]
+     ↓
+[Respond to Chat]
+
+5 nodes. Chat Trigger receives, AI Agent reasons with OpenAI, remembers recent turns, can hit Wikipedia, replies to user.`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Beginner advice · Start with OpenAI">
+  
+  Ollama is free and private, but local models need decent hardware and slower iteration. **Start with OpenAI gpt-4o-mini** — pennies, capable, stable. Swap to others later by replacing one node.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  
+  Drag an AI Agent, an OpenAI Chat Model, a Window Buffer Memory, and an HTTP Request Tool onto a canvas. **Don't connect them yet** — just observe their shapes and attachment ports. Read the labels.
+  
+</TipCallout>
+
+## Section recap
+
+- 5 LangChain roles: Chat Model / Agent / Memory / Tool / Vector Store
+- Root (main) + Sub (attached) connection pattern
+- Chat Model: OpenAI is the safest start; Ollama for privacy/cost
+- Agent default: "AI Agent" node
+- Memory makes multi-turn conversations possible
+- Tools let the Agent act
+- Vector Store powers RAG (§5.4)
+
+Next: [AI Agent internals](../ai-agent/).

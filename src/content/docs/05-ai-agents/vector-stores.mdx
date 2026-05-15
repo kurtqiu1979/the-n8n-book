@@ -1,0 +1,183 @@
+---
+title: Vector Store · 给 Agent 装"长期记忆"
+description: Pinecone / Qdrant / Supabase / Postgres pgvector / In-Memory —— 5 个向量库怎么选
+sidebar:
+  order: 5
+  label: 5.4 Vector Store
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 5 章 · 第 4 节</span>
+
+Memory 是"短期记忆"，记得最近聊了啥。**Vector Store** 是"长期记忆"——把整本 PDF / 公司知识库 / 历史邮件**变成可被语义搜索的索引**，让 Agent 查到相关片段后再回答。这是 **RAG (Retrieval-Augmented Generation)** 的基石。
+
+## 为什么需要 Vector Store
+
+LLM 知识有限——它不知道**你公司**的产品手册、**你的**邮件、**昨天**的新闻。
+
+直接把整份手册塞 Prompt？长度爆炸（gpt-4o 上下文也就 128K token，相当于 ~250 页 PDF）。
+
+**Vector Store 的解法**：
+1. **离线**：把文档切块 → 每块算向量（Embedding）→ 存进 Vector Store
+2. **在线**：用户问题 → 算向量 → 向量库**搜出最相关的几块** → 把这几块 + 问题一起给 LLM
+
+<TerminalCell filename="rag-flow.txt" runTag="📚">
+{`离线阶段（建立索引）：
+  PDF / 网页 / Notion
+       ↓
+  [Document Loader] 读取
+       ↓
+  [Text Splitter] 切成 500 字一块
+       ↓
+  [Embeddings 模型] 每块 → 1536 维向量
+       ↓
+  [Vector Store] 存向量 + 原文
+
+在线阶段（用户问答）：
+  用户："产品 X 怎么退款？"
+       ↓
+  [Embeddings] → 问题的向量
+       ↓
+  [Vector Store 搜索] → 找出最相似的 top-3 文档块
+       ↓
+  把这 3 块 + 原问题 → AI Agent → 生成回答`}
+</TerminalCell>
+
+## 5 个向量库怎么选
+
+| 节点 | 类型 | 适合 |
+|---|---|---|
+| **In-Memory Vector Store** | 内存 | 学习/小 demo（重启就丢） |
+| **Pinecone** | 托管 SaaS | 生产、海量、低运维 |
+| **Qdrant** | 开源自托管 / 云 | 自由度高、性价比好 |
+| **Supabase** | Postgres + pgvector | 数据库一体化方案 |
+| **Postgres** | 你的 PG + pgvector 插件 | 已经在用 Postgres 的团队 |
+
+### 决策
+
+<TerminalCell filename="vector-choice.txt" runTag="🎯">
+{`场景：纯学习、玩玩看
+  → In-Memory（零配置）
+
+场景：要上线、不想自己维护
+  → Pinecone（API 调一下就用，有免费额度）
+
+场景：自托管、敏感数据、长期省钱
+  → Qdrant Docker / Supabase
+
+场景：已经有 Postgres
+  → 装 pgvector 插件，复用现有数据库`}
+</TerminalCell>
+
+## Embeddings 模型怎么选
+
+Embeddings 节点也得挂（向量库需要"什么模型算的向量"）。常见选项：
+
+| 节点 | 维度 | 成本（每 1M token） | 何时用 |
+|---|---|---|---|
+| **OpenAI Embeddings (`text-embedding-3-small`)** | 1536 | $0.02 | 默认推荐 |
+| **OpenAI Embeddings (`text-embedding-3-large`)** | 3072 | $0.13 | 大规模、高精度 |
+| **Ollama Embeddings** | 本地模型 | 免费 | 隐私敏感、不联网 |
+| **Cohere Embeddings** | 1024 | 类似 OpenAI | 多语言 |
+
+<TipCallout type="warn" title="必读 · 建索引和查询要用同一个 Embeddings 模型">
+  
+  **离线建索引用 `text-embedding-3-small`，在线查询也必须用 `text-embedding-3-small`**。换模型 = 向量空间变了 = 检索结果全错。
+  
+</TipCallout>
+
+## 一个最小 RAG workflow（离线建索引）
+
+<TerminalCell filename="rag-ingest.txt" runTag="📥">
+{`workflow "Ingest Docs"（建索引，一次性跑）:
+
+[Manual Trigger]
+     ↓
+[HTTP Request]                       下载 PDF
+     ↓
+[Document Loader (PDF)]              解析 PDF 文本
+     ↓
+[Recursive Text Splitter]            切成块
+   Chunk Size:    500
+   Chunk Overlap: 50
+     ↓
+[Pinecone - Insert Documents]        写入向量库
+   Embeddings:    [OpenAI Embeddings small]   ← 子节点挂载
+   Index:         my-knowledge-base
+
+跑一次后 Pinecone 里就有 N 个向量+原文片段。`}
+</TerminalCell>
+
+## 在线查询：把 Vector Store 当 Agent 的 Tool
+
+<TerminalCell filename="rag-agent.txt" runTag="🤖">
+{`workflow "RAG Assistant"（用户问答用）:
+
+[Chat Trigger]
+     ↓
+[AI Agent]
+   Chat Model:    [OpenAI Chat Model]
+   Memory:        [Window Buffer Memory]
+   Tool:          [Vector Store Tool]
+                    Vector Store:  [Pinecone - Retrieve Documents]
+                                     Embeddings:    [OpenAI Embeddings small]
+                                     Top K:         3
+                    Name:          search_knowledge_base
+                    Description:   按用户问题搜索内部知识库，返回相关片段
+     ↓
+[Respond to Chat]
+
+用户问"产品 X 怎么退款？"，Agent 会：
+  1. 调 search_knowledge_base 工具
+  2. 拿到 3 段相关原文
+  3. 综合原文生成回答（"根据知识库，产品 X 的退款流程是..."）`}
+</TerminalCell>
+
+## 实战参数调优
+
+<TerminalCell filename="chunking-strategy.txt" runTag="✂">
+{`Chunk Size（每块多少字符）：
+  - 太小（< 200）：上下文不完整，检索准但答得碎
+  - 太大（> 1500）：一块包含太多无关内容，污染回答
+  - 默认 500-800 是甜区
+  
+Chunk Overlap（相邻块的重叠字符）：
+  - 0：可能切断关键句
+  - 10-20% of chunk size 是甜区
+  - 默认 50-100
+
+Top K（每次查询取几块）：
+  - 1-3：精确，但可能漏
+  - 5-10：覆盖广，但塞 prompt token 多
+  - 默认 3 起步`}
+</TerminalCell>
+
+<TipCallout type="warn" title="RAG 最大的坑 · 切块策略不对，怎么调 prompt 都没用">
+  
+  RAG 效果差的 90% 原因不在 LLM，而在**切块**。表格、代码、列表如果被中间切断，检索出来就没意义。
+  
+  **诊断**：先肉眼看几个查询的"取出的 3 块"是不是真包含答案。如果取出来的内容都不对，问题在切块；如果取出来的对但 Agent 回答错，问题在 LLM 或 prompt。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  做一个"个人 RSS 阅读管家"：
+  1. 一个 workflow 每天拉你订阅的几个 RSS 源 → 切块 → 存到 Pinecone（或 In-Memory 玩玩）
+  2. 另一个 workflow 给你提供 Chat Trigger 入口 → AI Agent + Vector Store Tool
+  3. 你问"昨天有什么关于 AI Agent 的新闻？"——Agent 检索后回答
+  
+</TipCallout>
+
+## 本节要点回顾
+
+- Vector Store 是 RAG 的核心——把文档变成可语义搜索的索引
+- 5 个选项：In-Memory（学）/ Pinecone（托管）/ Qdrant、Supabase、Postgres（自托管）
+- Embeddings 模型：默认 OpenAI `text-embedding-3-small`
+- **建索引和查询用同一个 Embeddings**（必须）
+- 离线建索引 → 在线把 Vector Store Tool 挂到 Agent
+- 调优重点：Chunk Size / Overlap / Top K
+
+下一节[RAG 实战](../rag-practice/)，把这些组件串成一个端到端的"PDF 问答助手"。

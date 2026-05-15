@@ -1,0 +1,194 @@
+---
+title: Chat Trigger · 把 Agent 接入真实入口
+description: 浏览器内嵌 chat / Slack / Telegram / 自家网站 —— 让 Agent 真正面向用户
+sidebar:
+  order: 7
+  label: 5.6 Chat Trigger
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 5 章 · 第 6 节</span>
+
+到现在你的 Agent 还只能在 n8n 编辑器里聊。最后一节：**把它推出去**——接到 Slack、Telegram、WhatsApp，或者嵌在你自己的网站上。
+
+## 4 种入口方式
+
+| 方式 | 节点 | 适合 |
+|---|---|---|
+| **n8n Chat UI** | Chat Trigger | 内部使用、原型 demo |
+| **嵌入网站** | Chat Trigger + 前端 SDK | 给客户用的对外 Bot |
+| **Slack / Discord / Teams** | App Trigger（Slack Trigger 等）| 团队内 Bot |
+| **Telegram / WhatsApp** | Telegram Trigger / WhatsApp Trigger | 个人助手 |
+
+## 方式 1 · n8n 自带 Chat UI
+
+Chat Trigger 节点生成一个**公开的聊天页面 URL**。打开就能聊：
+
+<TerminalCell filename="chat-trigger-config.txt" runTag="💬">
+{`Chat Trigger 节点参数：
+  Make Chat Publicly Available:  ON  (要打开)
+  Authentication:                None / Basic / n8n User Auth
+  Initial Messages:              "你好！我能帮你查公司手册。问吧。"
+  Allowed Origins (CORS):        *  (任意网站可嵌)
+  Title:                         "AI 助手"
+
+激活 workflow 后，节点会显示两个 URL:
+  - Chat URL（直接打开就是聊天界面）
+  - Webhook URL（前端 SDK 用）`}
+</TerminalCell>
+
+直接把 Chat URL 发给同事就能用了——零前端代码。
+
+## 方式 2 · 嵌入自己的网站
+
+n8n 提供了一个 npm 包 `@n8n/chat`，几行代码嵌到任意网页：
+
+<TerminalCell filename="embed-chat.txt" runTag="🌐">
+{`<!-- 你网站的 HTML -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" />
+<script type="module">
+  import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+  
+  createChat({
+    webhookUrl: 'https://n8n.example.com/webhook/<chat-trigger-id>',
+    mode: 'window',        // 或 'fullscreen'
+    initialMessages: ['你好！'],
+  });
+</script>
+
+效果：网页右下角出现聊天泡泡，点开就能跟你的 Agent 对话。`}
+</TerminalCell>
+
+## 方式 3 · Slack / Discord 集成
+
+替换 Chat Trigger 为 **Slack Trigger**，输出接 Slack 发消息节点：
+
+<TerminalCell filename="slack-bot.txt" runTag="💼">
+{`[Slack Trigger]                           监听 @AI-Bot 的提及
+   Trigger Event:  App Mention
+   ↓
+[AI Agent]
+   Chat Model:  OpenAI
+   Memory:      Postgres Chat Memory
+                Session Key: ={{ $json.user }}    Slack 用户 ID 作为会话 key
+   Tool:        Vector Store Tool / HTTP Tool / etc.
+   Prompt:      ={{ $json.text }}                  剥掉 @ 后的纯消息
+   ↓
+[Slack - Send Message]
+   Channel:  ={{ $('Slack Trigger').item.json.channel }}    回到原频道
+   Text:     ={{ $json.output }}
+   Thread:   ={{ $('Slack Trigger').item.json.ts }}         回成 thread`}
+</TerminalCell>
+
+设置好后，团队在任何 Slack 频道 `@AI-Bot 帮我查...` 就触发 Agent，回答会以 thread 形式回复。
+
+## 方式 4 · Telegram Bot（最简单的个人助手）
+
+<TerminalCell filename="telegram-bot.txt" runTag="📱">
+{`步骤：
+
+1. 找 @BotFather 在 Telegram 里创建一个 bot，拿到 token
+
+2. 在 n8n 配 Telegram Credentials，填 token
+
+3. workflow:
+   [Telegram Trigger]
+      Updates: Messages
+      ↓
+   [AI Agent]
+      Memory Session Key: ={{ $json.message.chat.id }}
+      Prompt: ={{ $json.message.text }}
+      ↓
+   [Telegram - Send Message]
+      Chat ID: ={{ $('Telegram Trigger').item.json.message.chat.id }}
+      Text:    ={{ $json.output }}
+
+4. 激活 workflow 后，给你的 bot 发消息，就回你了。
+
+成本：只要 OpenAI API 钱 + n8n 部署成本，自己用足够了。`}
+</TerminalCell>
+
+## 流式输出（Streaming）
+
+默认 Agent 是"等全部生成完了一次性返回"。如果想要 ChatGPT 那种**一字一字蹦**的效果：
+
+- **Chat Trigger 自带的 UI 已支持流式输出**——开 Agent 的 "Enable Streaming" 即可
+- **嵌入式 chat（@n8n/chat）** 同上
+- **Slack / Telegram** 不支持流式（API 本身不支持），只能等完整答案
+
+## 处理用户上传文件
+
+Chat Trigger 支持用户上传图片/文件：
+
+<TerminalCell filename="file-handling.txt" runTag="📎">
+{`Chat Trigger 配置：
+  Allow File Uploads: ON
+  Max File Size:      10 MB
+  Allowed Mime Types: image/*, application/pdf
+
+用户在 chat 里上传文件后，workflow 收到：
+  $json.chatInput      文字部分
+  $json.files          上传的文件数组
+
+下游可以：
+  - 图片 → 加 Vision 节点（OpenAI gpt-4o vision）
+  - PDF → 走 5.5 节那套 RAG ingest 流程`}
+</TerminalCell>
+
+## 实战：把 5.5 节的 RAG 助手接到 Telegram
+
+<TerminalCell filename="rag-on-telegram.txt" runTag="🎯">
+{`workflow: "RAG Telegram Bot"
+
+[Telegram Trigger]
+   ↓
+[AI Agent]
+   Chat Model:  OpenAI gpt-4o-mini
+   Memory:      Postgres Chat Memory (Session Key = chat.id)
+   Tool:        Vector Store Tool (pinecone "my-knowledge-base")
+   Prompt:      ={{ $json.message.text }}
+   ↓
+[Telegram - Send Message]
+   Chat ID:  ={{ $('Telegram Trigger').item.json.message.chat.id }}
+   Text:     ={{ $json.output }}
+
+效果：在 Telegram 跟 bot 聊天，它能就你 5.5 节灌进去的员工手册回答问题，
+跨设备记忆持久化（Postgres）。`}
+</TerminalCell>
+
+<TipCallout type="warn" title="生产部署的 3 个安全考虑">
+  
+  1. **公开 Chat URL 暴露在外网**：任何人能聊→烧你 API quota。生产前加 Authentication（Basic Auth / n8n User Auth）。
+  2. **滥用防护**：加 Rate Limit（每用户每分钟 N 次），用 Set 节点 + Postgres 自己记一下。
+  3. **PII 过滤**：用户可能输入手机号、身份证号——传给 LLM 前用 Code 节点脱敏。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  把你 5.5 节的 RAG 助手分别接到 **3 个入口**：
+  
+  1. n8n Chat UI（最快，原型）
+  2. Telegram Bot（个人用）
+  3. Slack Bot（团队用）
+  
+  共享同一个 Pinecone index（同一份知识库）但各自有独立 Session Key。
+  
+</TipCallout>
+
+## 本节要点回顾（也是整个第 5 部分回顾）
+
+- 4 种入口：n8n Chat UI / 嵌入网站 / Slack-Discord / Telegram-WhatsApp
+- Slack & Telegram 接入：Trigger 节点 → AI Agent → Send Message
+- Memory Session Key 用各自的用户 ID（chat.id / user.id）
+- 流式输出：Chat UI / 嵌入式支持，IM 平台不支持
+- 文件上传：Chat Trigger 直接支持，下游接 Vision / RAG ingest
+- **生产前**配 Auth、Rate Limit、PII 过滤
+
+---
+
+至此你已学完前 5 部分——**核心能力已经够你独立设计大多数复杂工作流**了。
+
+下一部分 [Part 6 · 实战案例集](../../06-case-library/overview/) —— 24 个真实场景的完整 workflow，每个含可视化 + 可复制 JSON。

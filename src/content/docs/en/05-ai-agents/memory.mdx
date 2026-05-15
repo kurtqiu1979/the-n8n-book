@@ -1,0 +1,197 @@
+---
+title: Memory · Let the Agent Remember
+description: Window Buffer / Summary Buffer / Postgres Chat Memory — how to pick
+sidebar:
+  order: 4
+  label: 5.3 Memory
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 5 · Section 3</span>
+
+By default, the Agent is a "goldfish" — each conversation is independent. To make it remember, attach a **Memory** sub-node. This section covers three Memory types and when to use each.
+
+## Without Memory
+
+<TerminalCell filename="no-memory.txt" runTag="🐟">
+{`User:  My name is Alice.
+Agent: Hello Alice, how can I help?
+
+User:  What did I just tell you my name was?
+Agent: I'm sorry, I don't know your name.
+
+  ↑ No Memory attached — each call is fresh`}
+</TerminalCell>
+
+With Window Buffer Memory:
+
+<TerminalCell filename="with-memory.txt" runTag="🧠">
+{`User:  My name is Alice.
+Agent: Hello Alice, how can I help?
+
+User:  What did I just tell you my name was?
+Agent: You said your name is Alice.
+
+  ↑ With Memory, the previous turn is auto-injected into this inference's context`}
+</TerminalCell>
+
+## Three Memory types
+
+### ① Window Buffer Memory (most common)
+
+Keeps **last N turns**, evicts older.
+
+<TerminalCell filename="window-buffer.txt" runTag="📦">
+{`Config:
+  Session Key:           ={{ $json.sessionId }}    user identifier
+  Context Window Length: 5                          last 5 turns
+
+Behavior:
+  Turn 1-5: all remembered
+  Turn 6 arrives: forget turn 1, keep 2-6
+  Turn 7: forget turn 2, keep 3-7
+  
+For: short conversations (support, Q&A) where ancient turns don't matter.`}
+</TerminalCell>
+
+### ② Summary Buffer Memory (long convo, token-efficient)
+
+Keeps **summary + recent turns**. LLM auto-summarizes older turns; new turns stay verbatim.
+
+<TerminalCell filename="summary-buffer.txt" runTag="📝">
+{`Config:
+  Session Key:           ={{ $json.sessionId }}
+  Max Token Limit:       2000          total cap for summary + recent turns
+
+Behavior:
+  Turn 1-10: 1800 tokens, all verbatim
+  Turn 11: > 2000 → auto-summarize turns 1-5 into ~200-token summary
+  Next: summary (200) + turns 6-11 (rest) → back under 2000
+
+For: long conversations, support multi-turn troubleshooting — you don't want to lose ancient context entirely.`}
+</TerminalCell>
+
+**Note:** summarization costs one LLM call each time it triggers — slightly more expensive than Window Buffer.
+
+### ③ Postgres / Redis Chat Memory (persistent)
+
+Window/Summary Buffer default to in-memory — **lost on workflow restart**. To survive restarts and cross-device continuation:
+
+<TerminalCell filename="postgres-memory.txt" runTag="🗄">
+{`Config:
+  Session Key:           ={{ $json.userId }}     per-user
+  Table Name:            chat_history             Postgres table name
+  Credential:            <Postgres connection>
+
+Behavior:
+  Every Agent run, INSERT the history into chat_history
+  New session start, SELECT recent N by session_key
+  
+For: real products that span sessions (chat SaaS, AI roleplay).`}
+</TerminalCell>
+
+Redis variant similar — shorter-term, high-throughput, doesn't need durability.
+
+## Critical: Session Key
+
+**Every Memory needs a Session Key** — the identifier of "whose conversation is this":
+
+<TerminalCell filename="session-key-examples.txt" runTag="🔑">
+{`Telegram bot:
+  Session Key: ={{ $json.message.from.id }}     Telegram user ID
+
+Slack bot:
+  Session Key: ={{ $json.user }}                Slack user ID
+
+Web chat:
+  Session Key: ={{ $json.userId }}              ID from your frontend
+
+Testing:
+  Session Key: test-session                     hardcoded, all conversations share
+
+❌ NEVER:
+  Session Key: empty
+  → All users share one memory! Cross-talk!`}
+</TerminalCell>
+
+## Memory decision tree
+
+<TerminalCell filename="memory-decision.txt" runTag="🌳">
+{`Q1: Single Q&A or multi-turn?
+    
+    [Single Q&A] ────────────────────→ No Memory
+    
+    [Multi-turn] → Q2
+
+Q2: Conversation length?
+    
+    [< 10 turns] ─────────────────→ Window Buffer Memory
+    
+    [Potentially long] ──────────→ Summary Buffer Memory
+
+Q3: Survives refresh/restart?
+    
+    [No, clear on refresh] ──────→ In-memory variants above
+    
+    [Yes, cross-session] ────────→ Postgres / Redis Chat Memory`}
+</TerminalCell>
+
+## Real: Telegram Bot with persistent memory
+
+<TerminalCell filename="telegram-with-memory.txt" runTag="💬">
+{`Workflow:
+
+[Telegram Trigger]
+     ↓
+[AI Agent]
+   Chat Model:  [OpenAI Chat Model]
+   Memory:      [Postgres Chat Memory]
+                  Session Key: ={{ $json.message.from.id }}
+                  Table: telegram_chat_history
+   Tool:        ... (as needed)
+     ↓
+[Telegram - Send Message]
+   Chat ID: ={{ $('Telegram Trigger').item.json.message.chat.id }}
+   Text:    ={{ $json.output }}
+
+Result: each Telegram user has independent, persistent memory.
+Survives n8n restarts.`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap 1 · Session Key mistake causes cross-talk">
+  
+  Most common incident. Two users share one Session Key (forgot dynamic injection, used hardcoded string) → Agent thinks they're the same person → context mixup, info leak.
+  
+  **Fix:** before going live, **test with at least two different users** — verify Session Key is truly dynamic.
+  
+</TipCallout>
+
+<TipCallout type="warn" title="Trap 2 · Memory vs token cost tradeoff">
+  
+  Longer conversations → more memory injected → more tokens per inference → more cost and latency.
+  
+  **Fix:** monitor token usage; don't over-Window (5-10 usually enough); switch to Summary Buffer for very long convos.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  
+  Add a Window Buffer Memory (length=5) to your "weather buddy" Agent from §5.2. Then chat:
+  
+  1. "What's the weather in Shanghai today?" — Agent should call the tool
+  2. "And tomorrow?" — does the Agent know you're asking about Shanghai tomorrow? Proves it remembers context
+  
+</TipCallout>
+
+## Section recap
+
+- Default Agent has no memory — attach a Memory sub-node
+- **Window Buffer:** last N turns (most common)
+- **Summary Buffer:** summary + recent (long convos, token-efficient)
+- **Postgres / Redis Chat Memory:** cross-session persistent
+- **Session Key must be dynamic** — wrong = cross-talk
+- Don't over-window; monitor token cost
+
+Next: [Vector Store + Embeddings](../vector-stores/) — give the Agent "long-term memory."

@@ -1,0 +1,203 @@
+---
+title: AI Agent · Autonomous Tool-Using Intelligence
+description: How the Agent "thinks" — ReAct loop, System Prompt, Tool descriptions
+sidebar:
+  order: 3
+  label: 5.2 AI Agent
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 5 · Section 2</span>
+
+AI Agent is the star of Part 5. It promotes the LLM from "a chatty brain" to "an actor with tools." This section explains its internals — once you understand how it thinks, your prompts and tool descriptions all become more targeted.
+
+## The internal loop (ReAct pattern)
+
+<TerminalCell filename="react-loop.txt" runTag="🔄">
+{`Agent receives input → enters a "think-act" loop:
+
+  ┌──────────────────────────────────────┐
+  │  Thought:                            │
+  │  "User asks for GitHub user torvalds │
+  │   I need to call the HTTP tool"      │
+  │                                      │
+  │  Action:                             │
+  │  Invoke HTTP Tool with URL=...       │
+  │                                      │
+  │  Observation:                        │
+  │  Received JSON { name: ..., ... }    │
+  └──────────────────────────────────────┘
+              ↓
+       Continue loop (max N iterations)
+              ↓
+  Final Answer → user`}
+</TerminalCell>
+
+This is **ReAct (Reason + Act)**: each step is "think then act," and the result feeds the next thought.
+
+## Key parameters
+
+<TerminalCell filename="agent-params.txt" runTag="⚙">
+{`AI Agent node Parameters:
+
+  ▸ Agent Type:         Tools Agent (default, strongest)
+  ▸ Source for Prompt:  Define below / From previous node
+  ▸ Prompt:             user input (usually ={{ $json.chatInput }})
+  ▸ System Message:     global instructions defining role and constraints
+  ▸ Max Iterations:     5    (max loop count, prevents infinite loops)
+  ▸ Return Intermediate Steps:  false  (turn on for debugging)`}
+</TerminalCell>
+
+## System Message — define the Agent's persona
+
+The Agent's "user manual" — tells it **who it is, what it can do, what it can't**.
+
+<TerminalCell filename="system-prompt-example.txt" runTag="📜">
+{`You are a professional e-commerce customer service assistant. Your duties:
+
+1. User asks order status → call get_order_status tool
+2. User wants refund → call process_refund tool (verify order # first)
+3. User asks product info → call search_products tool
+
+Boundary rules:
+- Don't discuss non-commerce topics
+- Operations over $1000 require human review
+- Always reply politely in English
+- Never fabricate order info — say "not found" if not found
+
+Output format: answer the question, end with "Anything else I can help with?"`}
+</TerminalCell>
+
+**Good System Message structure:** role + capability list + boundary rules + output format.
+
+## Tool descriptions — when the LLM should call them
+
+Every attached tool has a **Description** field. The LLM reads it to decide whether to invoke:
+
+<TerminalCell filename="tool-description.txt" runTag="📝">
+{`❌ Bad (Agent won't use it well):
+  Name:         http_call
+  Description:  send HTTP request
+
+✅ Good (Agent knows when to call):
+  Name:         get_user_profile
+  Description:  Look up a user's profile and points by email.
+                Input: email
+                Returns: name, points, level, vip_status
+
+Difference:
+  - Action verb clear
+  - Lists inputs
+  - States return shape
+  - No implementation details (LLM doesn't care which API)`}
+</TerminalCell>
+
+## Debugging: Intermediate Steps
+
+The most common beginner question: **"Why didn't the Agent call my tool?"**
+
+Toggle **Return Intermediate Steps** in Agent node → re-run → output now shows **every Thought / Action / Observation**:
+
+<TerminalCell filename="intermediate-steps.txt" runTag="🔍">
+{`Output gets an extra intermediateSteps field:
+
+[
+  {
+    "action": {
+      "tool": "get_user_profile",
+      "toolInput": { "email": "alice@x.com" }
+    },
+    "observation": "{ \\"name\\": \\"Alice\\", \\"points\\": 200, ... }"
+  },
+  {
+    "action": {
+      "tool": "send_email",
+      "toolInput": { ... }
+    },
+    "observation": "..."
+  }
+]
+
+You now see exactly what the Agent thought, called, and received.`}
+</TerminalCell>
+
+## Complete Agent workflow
+
+<TerminalCell filename="full-agent.txt" runTag="🎯">
+{`Scenario: customer service bot — order lookup + refund ETA
+
+[Chat Trigger]                                       entry
+     ↓
+[AI Agent]
+   Chat Model: [OpenAI gpt-4o-mini]
+   Memory:     [Window Buffer Memory] (size=10)
+   Tool 1:     [Postgres Tool "get_order"]
+                 Description: Look up order by ID
+   Tool 2:     [HTTP Tool "estimate_refund"]
+                 Description: Estimate refund arrival time given amount
+   System Message: You are XYZ customer service... (from above)
+     ↓
+[Respond to Chat]                                    reply to user
+
+Example dialog:
+  User: How long until refund for order #1234 arrives?
+  Agent → call get_order(1234) → got {amount: 500}
+       → call estimate_refund(500) → got {days: 3}
+       → "Refund of $500 for #1234 will arrive in ~3 days. Anything else?"`}
+</TerminalCell>
+
+## Agent failure modes & fixes
+
+<TipCallout type="warn" title="Trap 1 · Agent doesn't call tool, makes stuff up">
+  
+  **Cause:** Tool description vague — LLM thinks "I can answer this myself."
+  
+  **Fix:** Force in System Message: "For order queries you **must** call get_order — never fabricate data."
+  
+</TipCallout>
+
+<TipCallout type="warn" title="Trap 2 · Agent hits Max Iterations in a loop">
+  
+  **Cause:** Tool output makes LLM think "call again."
+  
+  **Fix:**
+  - Check tool Description clarity
+  - Read Intermediate Steps to find the loop point
+  - Lower Max Iterations to force exit (5 → 3)
+  
+</TipCallout>
+
+<TipCallout type="warn" title="Trap 3 · Token cost spirals">
+  
+  **Cause:** Every call runs full tool chain + long System Message.
+  
+  **Fix:**
+  - Use gpt-4o-mini instead of gpt-4o (10× cheaper)
+  - Shorten System Message
+  - Add Memory but limit window
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  
+  Build a "weather buddy" Agent:
+  1. Chat Trigger entry
+  2. AI Agent + OpenAI Chat Model
+  3. HTTP Tool calling wttr.in (no API key needed)
+  4. Tool Description clear: "Look up weather by city name"
+  5. Ask "What's the weather in Shanghai today?" — check that the tool actually fires (enable Intermediate Steps)
+  
+</TipCallout>
+
+## Section recap
+
+- Agent internals = **ReAct loop** (Thought → Action → Observation)
+- System Message: role + capabilities + boundaries + output format
+- Tool Description drives LLM decisions — **write it well**
+- Debug with **Return Intermediate Steps**
+- Max Iterations prevents infinite loops
+- Start with gpt-4o-mini for cost
+
+Next: [Memory](../memory/) — making the Agent remember.

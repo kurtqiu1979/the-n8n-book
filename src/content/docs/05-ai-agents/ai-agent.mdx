@@ -1,0 +1,203 @@
+---
+title: AI Agent 节点 · 自主调用工具的智能体
+description: Agent 是怎么"思考"的 —— ReAct 循环、System Prompt、Tool 描述
+sidebar:
+  order: 3
+  label: 5.2 AI Agent
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 5 章 · 第 2 节</span>
+
+AI Agent 节点是 Part 5 的主角。它把 LLM 从"只会聊天的脑子"升级成"能用工具的执行者"。这一节讲它内部到底怎么工作——理解原理后，你 prompt 怎么写、Tool 怎么描述都会有方向。
+
+## Agent 内部的循环 (ReAct 模式)
+
+<TerminalCell filename="react-loop.txt" runTag="🔄">
+{`Agent 收到用户输入 → 进入"思考-行动"循环：
+
+  ┌──────────────────────────────────────┐
+  │  Thought (思考):                     │
+  │  "用户问 GitHub 用户 torvalds 的资料 │
+  │   我需要调 HTTP 工具查一下"          │
+  │                                      │
+  │  Action (行动):                      │
+  │  调用 HTTP Tool with URL=...         │
+  │                                      │
+  │  Observation (观察):                 │
+  │  收到 JSON 响应 { name: ..., ... }   │
+  └──────────────────────────────────────┘
+              ↓
+       继续循环（最多 N 次）
+              ↓
+  Final Answer：整理回答给用户`}
+</TerminalCell>
+
+这就是 **ReAct (Reason + Act)** 模式。Agent 的每一步都是"先想再做"，每个 Action 的结果会反馈回下一轮思考。
+
+## Agent 节点的关键参数
+
+<TerminalCell filename="agent-params.txt" runTag="⚙">
+{`AI Agent 节点 Parameters:
+
+  ▸ Agent Type:         Tools Agent（默认，最强）
+  ▸ Source for Prompt:  Define below / From previous node
+  ▸ Prompt:             用户输入（通常 ={{ $json.chatInput }}）
+  ▸ System Message:     全局指令，定义 Agent 的角色和约束
+  ▸ Max Iterations:     5    (循环最多几轮，防死循环)
+  ▸ Return Intermediate Steps:  false  (调试时开)`}
+</TerminalCell>
+
+## System Message：定义 Agent 人设
+
+这是 Agent 的"使用说明书"——告诉它**自己是谁、能做什么、不能做什么**。
+
+<TerminalCell filename="system-prompt-example.txt" runTag="📜">
+{`你是一个专业的电商客服助手。你的职责：
+
+1. 用户问订单状态 → 调 get_order_status 工具
+2. 用户想退款 → 调 process_refund 工具（先确认订单号）
+3. 用户问产品信息 → 调 search_products 工具
+
+边界规则：
+- 不讨论与电商无关的话题
+- 涉及金额超过 1000 元的操作，回答"需要人工审核"
+- 始终用礼貌的中文回答
+- 不要捏造订单信息——查不到就说查不到
+
+输出格式：先回答用户问题，最后附一句"还有什么可以帮您？"`}
+</TerminalCell>
+
+**好 System Message 的结构**：角色 + 能力清单 + 边界规则 + 输出格式。
+
+## Tool 描述：让 Agent 知道何时用
+
+每个挂上去的工具都有一个 **Description** 字段。LLM 看这段描述决定要不要调它：
+
+<TerminalCell filename="tool-description.txt" runTag="📝">
+{`❌ 烂描述（Agent 用不好）：
+  Name:         http_call
+  Description:  发 HTTP 请求
+
+✅ 好描述（Agent 知道何时用）：
+  Name:         get_user_profile
+  Description:  根据用户邮箱查询用户的基本资料和积分。
+                输入：email (用户邮箱)
+                返回：name, points, level, vip_status
+
+差异：
+  - 用动词清楚说明"做什么"
+  - 列输入参数
+  - 说明返回内容
+  - 不写实现细节（Agent 不需要知道你调的是哪个 API）`}
+</TerminalCell>
+
+## 调试 Agent · Intermediate Steps
+
+新手最大的困惑：**"Agent 为啥不调我那个工具？"**
+
+打开 Agent 节点的 **Return Intermediate Steps** 开关——再运行就能看到 Agent **每一步的 Thought / Action / Observation**：
+
+<TerminalCell filename="intermediate-steps.txt" runTag="🔍">
+{`输出中会多一个 intermediateSteps 字段：
+
+[
+  {
+    "action": {
+      "tool": "get_user_profile",
+      "toolInput": { "email": "alice@x.com" }
+    },
+    "observation": "{ \\"name\\": \\"Alice\\", \\"points\\": 200, ... }"
+  },
+  {
+    "action": {
+      "tool": "send_email",
+      "toolInput": { ... }
+    },
+    "observation": "..."
+  }
+]
+
+看到这些就知道 Agent 想了什么、调了什么、得到了什么。`}
+</TerminalCell>
+
+## 一个完整 Agent workflow 实例
+
+<TerminalCell filename="full-agent.txt" runTag="🎯">
+{`场景：客服 Bot 能查订单 + 估算退款时间
+
+[Chat Trigger]                                       入口
+     ↓
+[AI Agent]
+   Chat Model: [OpenAI gpt-4o-mini]
+   Memory:     [Window Buffer Memory] (size=10)
+   Tool 1:     [Postgres Tool "get_order"]
+                 Description: 按订单号查订单详情
+   Tool 2:     [HTTP Tool "estimate_refund"]
+                 Description: 估算退款到账时间，输入金额返回天数
+   System Message: 你是 XYZ 电商客服... (前面那段)
+     ↓
+[Respond to Chat]                                    回复给用户
+
+对话举例:
+  用户：订单 #1234 的退款大概几天到？
+  Agent → 调 get_order(1234) → 收到 {amount: 500}
+       → 调 estimate_refund(500) → 收到 {days: 3}
+       → "您的订单 #1234 退款 ¥500，预计 3 天到账。还有什么可以帮您？"`}
+</TerminalCell>
+
+## Agent 翻车场景与解药
+
+<TipCallout type="warn" title="坑 1 · Agent 不调工具，自己瞎答">
+  
+  **原因**：Tool 描述太模糊，LLM 觉得"我自己能答"。
+  
+  **解药**：在 System Message 里**强制规则**——"涉及订单查询时**必须**调用 get_order 工具，不要自己捏造数据"。
+  
+</TipCallout>
+
+<TipCallout type="warn" title="坑 2 · Agent 死循环跑满 Max Iterations">
+  
+  **原因**：工具返回的内容让 LLM 反复想"再调一次"。
+  
+  **解药**：
+  - 检查工具 Description 是否清晰
+  - 看 Intermediate Steps 找循环点
+  - 降低 Max Iterations 强制截断（默认 5，可调到 3）
+  
+</TipCallout>
+
+<TipCallout type="warn" title="坑 3 · Agent 调用频率太高，token 烧得快">
+  
+  **原因**：每次都跑完整工具链 + 长 System Message。
+  
+  **解药**：
+  - 用 gpt-4o-mini 而非 gpt-4o（10x 便宜）
+  - 简化 System Message（不要塞太多边界规则）
+  - 加 Memory 但限制窗口（不要保留过多历史）
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  搭一个"天气小助手"Agent：
+  1. Chat Trigger 入口
+  2. AI Agent + OpenAI Chat Model
+  3. HTTP Tool 调 wttr.in 天气 API（无需 key）
+  4. Tool Description 写清楚"根据城市名查天气"
+  5. 试问"上海今天天气如何"——看 Agent 是不是真的调工具了（开 Intermediate Steps）
+  
+</TipCallout>
+
+## 本节要点回顾
+
+- Agent 内部 = **ReAct 循环**（Thought → Action → Observation）
+- System Message：角色 + 能力 + 边界 + 输出格式
+- Tool Description 是 LLM 决策的依据——**写好它**比改 prompt 更重要
+- 调试用 **Return Intermediate Steps** 看每一步
+- Max Iterations 防死循环
+- 用 gpt-4o-mini 起步省钱
+
+下一节[Memory 记忆](../memory/)——让 Agent 记得多轮对话。

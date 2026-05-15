@@ -1,0 +1,211 @@
+---
+title: RAG in Practice · From PDF to Smart Q&A
+description: End-to-end build of an AI assistant that answers from a PDF — full workflow breakdown
+sidebar:
+  order: 6
+  label: 5.5 RAG in Practice
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 5 · Section 5</span>
+
+Five sections of theory — time to put it together. From one PDF to an AI assistant that answers questions about its contents. Two workflows: **Ingest** (one-shot) + **Chat** (per user question).
+
+## System overview
+
+<TerminalCell filename="system-overview.txt" runTag="🏗">
+{`              One-shot                            Per Q&A
+┌────────────────────────────┐         ┌────────────────────────────┐
+│  Workflow 1: Ingest        │         │  Workflow 2: Chat          │
+│  Manual Trigger            │         │  Chat Trigger              │
+│  ↓                         │         │  ↓                         │
+│  download/read PDF         │         │  AI Agent                  │
+│  ↓                         │         │   ├ Chat Model             │
+│  chunk + embed             │         │   ├ Memory                 │
+│  ↓                         │         │   └ Vector Store Tool ─────────┐
+│  write Pinecone ──────────────────────────────────────────────────────► Pinecone
+│                            │         │  ↓                          │  │
+│                            │         │  Respond to Chat            │  │
+└────────────────────────────┘         └────────────────────────────┘  │
+                                                                       │
+                                          Pinecone Index ◀─────────────┘`}
+</TerminalCell>
+
+## Workflow 1 · Ingest
+
+### Structure
+
+<TerminalCell filename="ingest-canvas.txt" runTag="📥">
+{`[Manual Trigger]
+  → [HTTP Request: download PDF]
+  → [Extract from File: parse PDF text]
+  → [Default Data Loader: wrap into LangChain Document]
+  → [Recursive Character Text Splitter: chunk]
+  → [Pinecone Vector Store: Insert Documents]
+        ├ Embeddings: OpenAI Embeddings ('text-embedding-3-small')
+        ↑
+        Document Loader (sub-node)`}
+</TerminalCell>
+
+### Configuration
+
+<TerminalCell filename="ingest-config.txt" runTag="⚙">
+{`1. HTTP Request
+   URL: https://example.com/handbook.pdf
+   Response Format: File
+
+2. Extract from File
+   Operation: PDF
+   Input Binary Field: data
+   → outputs page text
+
+3. Recursive Character Text Splitter (attached under Document Loader)
+   Chunk Size:    800
+   Chunk Overlap: 100
+
+4. Pinecone Vector Store
+   Operation:     Insert Documents
+   Pinecone Index:  my-knowledge-base
+   Sub-nodes:
+     - Embeddings:        OpenAI Embeddings (text-embedding-3-small)
+     - Document Loader:   Default Data Loader  ← upstream connects from Extract from File`}
+</TerminalCell>
+
+Run once. Check Pinecone — N new vectors.
+
+<TipCallout type="warn" title="If your PDF is scanned (image-based)">
+  
+  Extract from File only handles text PDFs. Scanned PDFs need OCR. Options:
+  - **HTTP Request to external OCR API** (Mistral OCR, Google Vision, AWS Textract)
+  - Pass OCR output to the Text Splitter
+  
+</TipCallout>
+
+## Workflow 2 · Chat
+
+### Structure
+
+<TerminalCell filename="chat-canvas.txt" runTag="💬">
+{`[Chat Trigger]
+  → [AI Agent]
+        ├ Chat Model:  OpenAI Chat Model (gpt-4o-mini)
+        ├ Memory:      Window Buffer Memory (length=5)
+        └ Tool:        Vector Store Tool
+                          ├ Vector Store: Pinecone (Retrieve Documents)
+                          │                  └ Embeddings: OpenAI Embeddings (same model!)
+                          ├ Name:         knowledge_search
+                          └ Description:  Search employee handbook by user question, returns relevant chunks
+  → [Respond to Chat]`}
+</TerminalCell>
+
+### Key configuration
+
+<TerminalCell filename="chat-config.txt" runTag="⚙">
+{`1. Chat Trigger
+   - Default works (generates a webhook URL; test in browser)
+
+2. AI Agent
+   - Agent Type:     Tools Agent
+   - System Message:
+       You are an internal knowledge assistant. Answer employee questions about the handbook.
+       Strict rules:
+       - Always call knowledge_search first, then synthesize
+       - Don't invent — if no relevant content found, say "Not in the knowledge base, contact HR"
+       - Cite as "[handbook section X]"
+   - Prompt:         ={{ $json.chatInput }}
+
+3. Vector Store Tool (key!)
+   - Name:        knowledge_search
+   - Description: Search employee handbook for content related to the user's question. Use for any policy, process, benefit, or leave questions.
+   - Sub-nodes:
+     · Vector Store: Pinecone (Retrieve Documents)
+        - Operation:   Retrieve Documents (As Tool)
+        - Pinecone Index: my-knowledge-base
+        - Top K:       3
+        - Embeddings:  OpenAI Embeddings (text-embedding-3-small) ← matches Ingest
+
+4. Respond to Chat
+   - Default — passes Agent's output back to the chat UI`}
+</TerminalCell>
+
+## Test
+
+Open the Chat Trigger Test URL (browser), enter a question:
+
+<TerminalCell filename="test-conversation.txt" runTag="🧪">
+{`User: Can I roll over annual leave to next year?
+
+Agent internally:
+  → Call knowledge_search("Can I roll over annual leave to next year")
+  → Receive 3 chunks about leave policy
+  → Synthesize
+
+Answer:
+"Per the handbook §4, unused annual leave can roll over up to 5 days
+ to next year; anything beyond expires. [handbook §4]"`}
+</TerminalCell>
+
+## RAG debugging playbook
+
+<TerminalCell filename="rag-debug.txt" runTag="🔧">
+{`1. Answer wrong? First check if the Agent called the tool
+   → Enable Return Intermediate Steps; see if LLM fabricated
+   → Didn't call: tighten Tool Description / strengthen System Message
+
+2. Called tool but answer wrong? Look at retrieved chunks
+   → Run Vector Store Retrieve alone with the user question
+   → Top K results — do they actually contain the answer?
+   → No: tune chunking strategy (larger / smaller chunk size, adjust Top K)
+
+3. Retrieved chunks are right but Agent answers wrong?
+   → Reinforce System Message: "Answer strictly based on retrieved chunks"
+   → Upgrade model (gpt-4o-mini → gpt-4o)
+
+4. Everything right but answer too slow?
+   → Reduce Top K (3 → 2)
+   → Reduce Memory window
+   → Faster model (Groq)`}
+</TerminalCell>
+
+## Advanced: multiple document sources
+
+Store multiple sources (employee handbook + product manual + FAQ) in **the same index with metadata tags**, filter at query time:
+
+<TerminalCell filename="multi-source.txt" runTag="📚">
+{`Ingest:
+  Pinecone Insert
+    metadata: { source: "employee-handbook", section: "leave" }
+    metadata: { source: "product-manual", product: "X" }
+
+Query:
+  Pinecone Retrieve
+    Filter: { source: "employee-handbook" }     ← only employee handbook
+  or
+    Filter: { source: "product-manual" }        ← only product manual
+
+You can "route" — let the LLM classify which domain the question fits, then pick filter.`}
+</TerminalCell>
+
+<TipCallout type="quest" title="Extension challenge">
+  
+  Extend this RAG into a "personal email assistant":
+  
+  1. Pull last 7 days Gmail weekly (Gmail Trigger + Schedule)
+  2. Chunk + write to a new Pinecone index "my-emails"
+  3. Chat Trigger + AI Agent + Vector Store Tool against that index
+  4. Ask "What did my boss say last week?" → find relevant email chunks
+  
+</TipCallout>
+
+## Section recap
+
+- RAG = **two workflows**: Ingest (build index) + Chat (Q&A)
+- Ingest chain: HTTP → Extract from File → Splitter → Vector Store Insert
+- Chat: Chat Trigger → AI Agent (with Vector Store Tool) → Respond
+- Embeddings model **must match** on both sides
+- Three debug layers: tool called → retrieval quality → generation quality
+- Multi-source: use metadata + filter for routing
+
+Next: [Chat Trigger and multi-turn](../chat-trigger/) — connect this RAG to Slack / Telegram / your own site.

@@ -1,0 +1,194 @@
+---
+title: Chat Trigger · Connect the Agent to Real Entry Points
+description: Embedded chat / Slack / Telegram / your own site — make the Agent user-facing
+sidebar:
+  order: 7
+  label: 5.6 Chat Trigger
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 5 · Section 6</span>
+
+So far your Agent only chats inside the n8n editor. Last section: **ship it** — into Slack, Telegram, WhatsApp, or embedded in your own website.
+
+## Four entry-point options
+
+| Approach | Node | For |
+|---|---|---|
+| **n8n Chat UI** | Chat Trigger | Internal use, prototype demos |
+| **Embed on site** | Chat Trigger + frontend SDK | Customer-facing bot |
+| **Slack / Discord / Teams** | App Trigger (Slack Trigger etc.) | Team-internal bot |
+| **Telegram / WhatsApp** | Telegram Trigger / WhatsApp Trigger | Personal assistant |
+
+## Option 1 · n8n's built-in Chat UI
+
+Chat Trigger generates a **public chat page URL**. Open it, chat:
+
+<TerminalCell filename="chat-trigger-config.txt" runTag="💬">
+{`Chat Trigger parameters:
+  Make Chat Publicly Available:  ON  (required)
+  Authentication:                None / Basic / n8n User Auth
+  Initial Messages:              "Hi! Ask me about the handbook."
+  Allowed Origins (CORS):        *  (embeddable anywhere)
+  Title:                         "AI Assistant"
+
+After activation, the node shows two URLs:
+  - Chat URL (open directly, get a chat interface)
+  - Webhook URL (used by frontend SDK)`}
+</TerminalCell>
+
+Send the Chat URL to colleagues — zero frontend code.
+
+## Option 2 · Embed in your site
+
+n8n provides `@n8n/chat`, a few lines embed it anywhere:
+
+<TerminalCell filename="embed-chat.txt" runTag="🌐">
+{`<!-- your site HTML -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" />
+<script type="module">
+  import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+
+  createChat({
+    webhookUrl: 'https://n8n.example.com/webhook/<chat-trigger-id>',
+    mode: 'window',        // or 'fullscreen'
+    initialMessages: ['Hi!'],
+  });
+</script>
+
+Effect: chat bubble at bottom-right of your page; click to open and chat.`}
+</TerminalCell>
+
+## Option 3 · Slack / Discord
+
+Swap Chat Trigger for **Slack Trigger**, output goes to Slack send-message node:
+
+<TerminalCell filename="slack-bot.txt" runTag="💼">
+{`[Slack Trigger]                           listen for @AI-Bot mentions
+   Trigger Event:  App Mention
+   ↓
+[AI Agent]
+   Chat Model:  OpenAI
+   Memory:      Postgres Chat Memory
+                Session Key: ={{ $json.user }}    Slack user ID as session key
+   Tool:        Vector Store Tool / HTTP Tool / etc.
+   Prompt:      ={{ $json.text }}                  message after stripping @
+   ↓
+[Slack - Send Message]
+   Channel:  ={{ $('Slack Trigger').item.json.channel }}    back to origin channel
+   Text:     ={{ $json.output }}
+   Thread:   ={{ $('Slack Trigger').item.json.ts }}         reply in thread`}
+</TerminalCell>
+
+Now teammates can `@AI-Bot help me find...` in any Slack channel and get a threaded reply.
+
+## Option 4 · Telegram Bot (simplest personal assistant)
+
+<TerminalCell filename="telegram-bot.txt" runTag="📱">
+{`Steps:
+
+1. Talk to @BotFather in Telegram, create a bot, get a token
+
+2. Set up Telegram Credentials in n8n with the token
+
+3. Workflow:
+   [Telegram Trigger]
+      Updates: Messages
+      ↓
+   [AI Agent]
+      Memory Session Key: ={{ $json.message.chat.id }}
+      Prompt: ={{ $json.message.text }}
+      ↓
+   [Telegram - Send Message]
+      Chat ID: ={{ $('Telegram Trigger').item.json.message.chat.id }}
+      Text:    ={{ $json.output }}
+
+4. Activate the workflow, send your bot a message — it replies.
+
+Cost: just OpenAI tokens + n8n hosting. Plenty for personal use.`}
+</TerminalCell>
+
+## Streaming output
+
+Default: Agent waits for full response, returns once. To get the ChatGPT-style **character-by-character** stream:
+
+- **Chat Trigger's built-in UI supports streaming** — enable "Enable Streaming" on Agent
+- **Embedded chat (@n8n/chat)** same
+- **Slack / Telegram** don't support streaming (API limitations); only complete responses
+
+## Handling user file uploads
+
+Chat Trigger supports image/file uploads:
+
+<TerminalCell filename="file-handling.txt" runTag="📎">
+{`Chat Trigger config:
+  Allow File Uploads: ON
+  Max File Size:      10 MB
+  Allowed Mime Types: image/*, application/pdf
+
+After upload, workflow receives:
+  $json.chatInput      text part
+  $json.files          uploaded files array
+
+Downstream:
+  - Image → Vision node (OpenAI gpt-4o vision)
+  - PDF → §5.5 RAG ingest flow`}
+</TerminalCell>
+
+## Real: connect §5.5 RAG assistant to Telegram
+
+<TerminalCell filename="rag-on-telegram.txt" runTag="🎯">
+{`Workflow: "RAG Telegram Bot"
+
+[Telegram Trigger]
+   ↓
+[AI Agent]
+   Chat Model:  OpenAI gpt-4o-mini
+   Memory:      Postgres Chat Memory (Session Key = chat.id)
+   Tool:        Vector Store Tool (pinecone "my-knowledge-base")
+   Prompt:      ={{ $json.message.text }}
+   ↓
+[Telegram - Send Message]
+   Chat ID:  ={{ $('Telegram Trigger').item.json.message.chat.id }}
+   Text:     ={{ $json.output }}
+
+Effect: chat with the bot on Telegram, it answers from the handbook you ingested in §5.5,
+with cross-device persistent memory (Postgres).`}
+</TerminalCell>
+
+<TipCallout type="warn" title="Three production security considerations">
+  
+  1. **Public Chat URL is exposed**: anyone can chat → burns your API quota. Before going live, add Authentication (Basic Auth / n8n User Auth).
+  2. **Abuse protection**: rate-limit (N calls/min per user) — Set node + Postgres logging.
+  3. **PII filtering**: users may type phone numbers, IDs — sanitize with a Code node before passing to LLM.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  
+  Connect your §5.5 RAG assistant to **three entry points**:
+  
+  1. n8n Chat UI (fastest prototype)
+  2. Telegram Bot (personal)
+  3. Slack Bot (team)
+  
+  Share the same Pinecone index (one knowledge base) but each has its own Session Key.
+  
+</TipCallout>
+
+## Section recap (and Part 5 recap)
+
+- 4 entry points: n8n Chat UI / embed on site / Slack-Discord / Telegram-WhatsApp
+- Slack & Telegram integration: Trigger → AI Agent → Send Message
+- Memory Session Key uses platform user ID (chat.id / user.id)
+- Streaming: Chat UI / embed support; IM platforms don't
+- File uploads: Chat Trigger supports natively; downstream Vision / RAG ingest
+- **Before going live**: Auth, rate limit, PII filtering
+
+---
+
+You've finished the first 5 Parts — **your core abilities now cover most complex workflow design**.
+
+Next: [Part 6 · Case Library](../../06-case-library/overview/) — 24 real-world workflows, each with visualization + copyable JSON.

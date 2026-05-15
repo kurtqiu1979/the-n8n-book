@@ -1,0 +1,212 @@
+---
+title: RAG 实战 · 从 PDF 到智能问答
+description: 端到端搭建一个能回答 PDF 内容的 AI 助手 —— 完整 workflow 拆解
+sidebar:
+  order: 6
+  label: 5.5 RAG 实战
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 5 章 · 第 5 节</span>
+
+理论看了几节，这一节**全部串起来**：从一份 PDF 到一个能就 PDF 内容回答用户问题的 AI 助手。两个 workflow：**索引 workflow**（一次性）+ **查询 workflow**（用户每问一次跑一次）。
+
+## 系统全景
+
+<TerminalCell filename="system-overview.txt" runTag="🏗">
+{`              一次性                           每次问答
+┌────────────────────────────┐         ┌────────────────────────────┐
+│  Workflow 1: Ingest        │         │  Workflow 2: Chat          │
+│  Manual Trigger            │         │  Chat Trigger              │
+│  ↓                         │         │  ↓                         │
+│  下载/读取 PDF              │         │  AI Agent                  │
+│  ↓                         │         │   ├ Chat Model             │
+│  切块 + 算 Embedding        │         │   ├ Memory                 │
+│  ↓                         │         │   └ Vector Store Tool ────────┐
+│  写 Pinecone ──────────────────────────────────────────────────────► Pinecone
+│                            │         │  ↓                         │  │
+│                            │         │  Respond to Chat           │  │
+└────────────────────────────┘         └────────────────────────────┘  │
+                                                                       │
+                                          Pinecone 索引 ◀──────────────┘`}
+</TerminalCell>
+
+## Workflow 1 · Ingest（建索引）
+
+### 整体结构
+
+<TerminalCell filename="ingest-canvas.txt" runTag="📥">
+{`[Manual Trigger]
+  → [HTTP Request: 下载 PDF]
+  → [Extract from File: 解析 PDF 文本]
+  → [Default Data Loader: 包装成 LangChain Document]
+  → [Recursive Character Text Splitter: 切块]
+  → [Pinecone Vector Store: Insert Documents]
+        ├ Embeddings: OpenAI Embeddings ('text-embedding-3-small')
+        ↑
+        Document Loader (子节点挂载)`}
+</TerminalCell>
+
+### 节点配置详解
+
+<TerminalCell filename="ingest-config.txt" runTag="⚙">
+{`1. HTTP Request
+   URL: https://example.com/handbook.pdf
+   Response Format: File
+
+2. Extract from File
+   Operation: PDF
+   Input Binary Field: data
+   → 输出每页的文本
+
+3. Recursive Character Text Splitter（挂在 Document Loader 下）
+   Chunk Size:    800
+   Chunk Overlap: 100
+
+4. Pinecone Vector Store
+   Operation:     Insert Documents
+   Pinecone Index:  my-knowledge-base
+   挂载子节点:
+     - Embeddings:        OpenAI Embeddings (text-embedding-3-small)
+     - Document Loader:   Default Data Loader  ← 上游接 Extract from File`}
+</TerminalCell>
+
+跑一次。看 Pinecone 控制台，应该多了 N 个向量。
+
+<TipCallout type="warn" title="如果你的 PDF 是图片扫描版">
+  
+  Extract from File 只能提取文字 PDF 的文本。扫描版 PDF（图片格式）需要 OCR 才能拿到文本。可以用：
+  - **HTTP Request 调外部 OCR API**（如 Mistral OCR、Google Vision、AWS Textract）
+  - 然后把 OCR 结果交给 Text Splitter
+  
+</TipCallout>
+
+## Workflow 2 · Chat（用户问答）
+
+### 整体结构
+
+<TerminalCell filename="chat-canvas.txt" runTag="💬">
+{`[Chat Trigger]
+  → [AI Agent]
+        ├ Chat Model:  OpenAI Chat Model (gpt-4o-mini)
+        ├ Memory:      Window Buffer Memory (length=5)
+        └ Tool:        Vector Store Tool
+                          ├ Vector Store: Pinecone (Retrieve Documents)
+                          │                  └ Embeddings: OpenAI Embeddings (same model!)
+                          ├ Name:         knowledge_search
+                          └ Description:  搜索员工手册，输入用户问题，返回最相关的文档片段
+  → [Respond to Chat]`}
+</TerminalCell>
+
+### 关键节点配置
+
+<TerminalCell filename="chat-config.txt" runTag="⚙">
+{`1. Chat Trigger
+   - 默认配置即可（生成一个 webhook URL，浏览器测试用 Test URL）
+
+2. AI Agent
+   - Agent Type:     Tools Agent
+   - System Message: 
+       你是公司内部知识助手。回答员工关于公司手册的问题。
+       严格规则：
+       - 必须先调 knowledge_search 工具检索原文，再综合回答
+       - 不要凭空回答——找不到相关内容就说"知识库里没找到，建议联系 HR"
+       - 引用时用 "[手册第 X 节]" 标注
+   - Prompt:         ={{ $json.chatInput }}
+
+3. Vector Store Tool（关键！）
+   - Name:        knowledge_search
+   - Description: 按用户问题搜索员工手册内容，返回相关原文片段。
+                  适用：任何关于公司政策、流程、福利、休假等的问题。
+   - 子节点：
+     · Vector Store: Pinecone (Retrieve Documents)
+        - Operation:   Retrieve Documents (As Tool)
+        - Pinecone Index: my-knowledge-base
+        - Top K:       3
+        - Embeddings:  OpenAI Embeddings (text-embedding-3-small) ← 跟 Ingest 一致
+
+4. Respond to Chat
+   - 默认即可，会把 Agent 的 output 返回给 Chat UI`}
+</TerminalCell>
+
+## 测试
+
+打开 Chat Trigger 的 Test URL（浏览器），输入问题：
+
+<TerminalCell filename="test-conversation.txt" runTag="🧪">
+{`用户：年假可以攒到第二年吗？
+
+Agent 内部：
+  → 调 knowledge_search("年假可以攒到第二年吗")
+  → 拿到 3 段相关原文（关于年假政策的章节）
+  → 综合生成回答
+
+回答：
+"根据手册第 4 节，未休完的年假最多可以结转 5 天到下一年，
+ 超出部分自动失效。[手册第 4 节]"`}
+</TerminalCell>
+
+## 调试 RAG 的标准动作
+
+<TerminalCell filename="rag-debug.txt" runTag="🔧">
+{`1. 答得不对？先看 Agent 调没调工具
+   → 开 Return Intermediate Steps，看是不是 LLM 自己瞎答了
+   → 没调：改 Tool Description / 加强 System Message 强制调用
+
+2. 调了工具但答得不对？看检索回来的内容
+   → 复制问题，单独运行 Vector Store Retrieve 节点
+   → 看 Top K 出来的 3 段是不是真包含答案
+   → 没包含：调切块策略（更大 chunk size / 更小 chunk size），或调 Top K
+
+3. 检索回来的对但 Agent 回答错？
+   → 加强 System Message："必须基于检索结果回答，不要捏造"
+   → 换更强的模型（gpt-4o-mini → gpt-4o）
+
+4. 一切都对但回答太慢？
+   → 减少 Top K（3 → 2）
+   → 减少 Memory window
+   → 换更快的模型（Groq）`}
+</TerminalCell>
+
+## 进阶：多文档源
+
+把多个文档源（员工手册 + 产品手册 + FAQ）存到**同一个 index 但加 metadata 标签**，查询时可按 metadata 过滤：
+
+<TerminalCell filename="multi-source.txt" runTag="📚">
+{`Ingest 时：
+  Pinecone Insert
+    metadata: { source: "employee-handbook", section: "leave" }
+    metadata: { source: "product-manual", product: "X" }
+
+查询时：
+  Pinecone Retrieve
+    Filter: { source: "employee-handbook" }     ← 只搜员工手册
+  或
+    Filter: { source: "product-manual" }        ← 只搜产品手册
+
+可以做"路由"——先用 LLM 判断问题属于哪个域，再选对应 filter。`}
+</TerminalCell>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  把这个 RAG 系统扩展成"个人邮件助手"：
+  
+  1. 每周自动拉 Gmail 最近 7 天邮件（Gmail Trigger + Schedule）
+  2. 切块 + 写入一个新的 Pinecone index "my-emails"
+  3. Chat Trigger 配 AI Agent + Vector Store Tool 搜索这个 index
+  4. 问"老板上周说过什么？" → 找出相关邮件原文片段
+  
+</TipCallout>
+
+## 本节要点回顾
+
+- RAG 系统 = **两个 workflow**：Ingest（建索引）+ Chat（查问答）
+- Ingest 关键节点链：HTTP → Extract from File → Splitter → Vector Store Insert
+- Chat 关键节点：Chat Trigger → AI Agent (with Vector Store Tool) → Respond
+- Embeddings 模型**两端必须一致**
+- 调试三层：是否调工具 → 检索内容 → 生成质量
+- 多文档源用 metadata + filter 路由
+
+下一节[Chat Trigger 与多轮对话](../chat-trigger/)——把这套 RAG 系统接到 Slack / Telegram 等真实入口。

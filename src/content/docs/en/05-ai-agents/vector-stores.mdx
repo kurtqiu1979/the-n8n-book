@@ -1,0 +1,183 @@
+---
+title: Vector Store · Long-Term Memory for Agents
+description: Pinecone / Qdrant / Supabase / Postgres pgvector / In-Memory — pick the right one
+sidebar:
+  order: 5
+  label: 5.4 Vector Store
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+
+<span class="editorial-label">Chapter 5 · Section 4</span>
+
+Memory is "short-term" — what was just said. **Vector Store** is "long-term" — turn entire PDFs / company knowledge bases / email archives into a **semantically searchable index** so the Agent can retrieve relevant chunks before answering. This is the foundation of **RAG (Retrieval-Augmented Generation)**.
+
+## Why Vector Store
+
+LLMs have a knowledge cutoff — they don't know **your** company's manual, **your** emails, **yesterday's** news.
+
+Stuff the whole manual into the prompt? Length explosion (even gpt-4o's 128K context = ~250 pages).
+
+**Vector Store solution:**
+1. **Offline:** chunk documents → compute Embedding per chunk → store in Vector Store
+2. **Online:** user question → compute embedding → Vector Store **finds top relevant chunks** → send chunks + question to LLM
+
+<TerminalCell filename="rag-flow.txt" runTag="📚">
+{`Offline (indexing):
+  PDF / web / Notion
+       ↓
+  [Document Loader] read
+       ↓
+  [Text Splitter] chunks of ~500 chars
+       ↓
+  [Embeddings model] each chunk → 1536-dim vector
+       ↓
+  [Vector Store] save vectors + original text
+
+Online (Q&A):
+  User: "How do I refund product X?"
+       ↓
+  [Embeddings] → question's vector
+       ↓
+  [Vector Store search] → top-3 most similar chunks
+       ↓
+  These 3 chunks + question → AI Agent → answer`}
+</TerminalCell>
+
+## 5 Vector Stores compared
+
+| Node | Type | For |
+|---|---|---|
+| **In-Memory Vector Store** | In-memory | Learning/small demos (lost on restart) |
+| **Pinecone** | Managed SaaS | Production, large scale, low ops |
+| **Qdrant** | Open source self-host / cloud | High flexibility, cost-effective |
+| **Supabase** | Postgres + pgvector | Database-integrated solution |
+| **Postgres** | Your PG + pgvector extension | Teams already on Postgres |
+
+### Decision
+
+<TerminalCell filename="vector-choice.txt" runTag="🎯">
+{`Just learning, toying
+  → In-Memory (zero config)
+
+Going live, don't want ops
+  → Pinecone (API away, free tier)
+
+Self-host, sensitive data, long-term savings
+  → Qdrant Docker / Supabase
+
+Already using Postgres
+  → Install pgvector extension, reuse existing DB`}
+</TerminalCell>
+
+## Embeddings models
+
+Embeddings node must be attached too (Vector Store needs to know "which model computed these vectors"):
+
+| Node | Dim | Cost (per 1M tokens) | When |
+|---|---|---|---|
+| **OpenAI Embeddings (`text-embedding-3-small`)** | 1536 | $0.02 | Default pick |
+| **OpenAI Embeddings (`text-embedding-3-large`)** | 3072 | $0.13 | Large scale, high precision |
+| **Ollama Embeddings** | local | Free | Privacy-sensitive |
+| **Cohere Embeddings** | 1024 | Similar to OpenAI | Multilingual |
+
+<TipCallout type="warn" title="Must read · Index and query must use the same Embeddings model">
+  
+  **Use `text-embedding-3-small` for indexing → use `text-embedding-3-small` for query too.** Different models = different vector spaces = retrieval results are garbage.
+  
+</TipCallout>
+
+## A minimal RAG workflow (offline indexing)
+
+<TerminalCell filename="rag-ingest.txt" runTag="📥">
+{`Workflow "Ingest Docs" (one-shot):
+
+[Manual Trigger]
+     ↓
+[HTTP Request]                       download PDF
+     ↓
+[Document Loader (PDF)]              parse PDF text
+     ↓
+[Recursive Text Splitter]            chunk
+   Chunk Size:    500
+   Chunk Overlap: 50
+     ↓
+[Pinecone - Insert Documents]        write to Vector Store
+   Embeddings:    [OpenAI Embeddings small]   ← sub-node
+   Index:         my-knowledge-base
+
+Run once → Pinecone now has N vectors + original chunks.`}
+</TerminalCell>
+
+## Online query: Vector Store as Agent's Tool
+
+<TerminalCell filename="rag-agent.txt" runTag="🤖">
+{`Workflow "RAG Assistant" (per-query):
+
+[Chat Trigger]
+     ↓
+[AI Agent]
+   Chat Model:    [OpenAI Chat Model]
+   Memory:        [Window Buffer Memory]
+   Tool:          [Vector Store Tool]
+                    Vector Store:  [Pinecone - Retrieve Documents]
+                                     Embeddings:    [OpenAI Embeddings small]
+                                     Top K:         3
+                    Name:          search_knowledge_base
+                    Description:   Search internal knowledge base by user question; returns relevant chunks
+     ↓
+[Respond to Chat]
+
+User asks "How do I refund product X?", Agent:
+  1. Call search_knowledge_base tool
+  2. Receive 3 relevant chunks
+  3. Synthesize: "Based on the knowledge base, product X refund flow is..."`}
+</TerminalCell>
+
+## Tuning parameters
+
+<TerminalCell filename="chunking-strategy.txt" runTag="✂">
+{`Chunk Size (chars per chunk):
+  - Too small (< 200): incomplete context, accurate retrieval but fragmented answers
+  - Too large (> 1500): one chunk contains too much noise, pollutes answer
+  - Sweet spot: 500-800
+  
+Chunk Overlap (chars overlapping between chunks):
+  - 0: may split key sentences
+  - 10-20% of chunk size is sweet spot
+  - Defaults 50-100
+
+Top K (chunks per query):
+  - 1-3: precise, may miss
+  - 5-10: wider coverage, more tokens
+  - Start with 3`}
+</TerminalCell>
+
+<TipCallout type="warn" title="RAG's biggest pit · Bad chunking, no prompt tweak helps">
+  
+  90% of poor RAG quality is chunking, not the LLM. Tables, code, lists cut in half become meaningless.
+  
+  **Diagnose:** look at the top-3 retrieved chunks for a query. Do they actually contain the answer? If no → fix chunking. If yes but Agent answers wrong → fix LLM/prompt.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extension challenge">
+  
+  Build a "personal RSS reader assistant":
+  1. One workflow pulls your subscribed RSS feeds daily → chunk → store in Pinecone (or In-Memory for play)
+  2. Another workflow exposes Chat Trigger → AI Agent + Vector Store Tool
+  3. You ask "What's the news on AI Agents from yesterday?" — Agent retrieves and answers
+  
+</TipCallout>
+
+## Section recap
+
+- Vector Store is RAG's core — turn docs into semantically searchable index
+- 5 options: In-Memory (learning) / Pinecone (managed) / Qdrant, Supabase, Postgres (self-host)
+- Embeddings model default: OpenAI `text-embedding-3-small`
+- **Index and query must use same Embeddings** (mandatory)
+- Offline build index → online attach Vector Store Tool to Agent
+- Tuning trio: Chunk Size / Overlap / Top K
+
+Next: [RAG in practice](../rag-practice/) — assemble these into an end-to-end "PDF Q&A assistant."

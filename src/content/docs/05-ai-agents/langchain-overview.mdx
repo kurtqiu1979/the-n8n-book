@@ -1,0 +1,174 @@
+---
+title: LangChain 节点全景 · 70+ AI 节点分类
+description: n8n 内置的 LangChain 节点按角色分 5 类 —— 模型 / Agent / Memory / Tool / Vector
+sidebar:
+  order: 2
+  label: 5.1 LangChain 全景
+---
+
+import TerminalCell from '../../../components/TerminalCell.astro';
+import TipCallout from '../../../components/TipCallout.astro';
+
+<span class="editorial-label">第 5 章 · 第 1 节</span>
+
+n8n 1.x 之后把 [LangChain](https://js.langchain.com/) 整合进来了，提供 70+ AI 相关节点。看起来眼花缭乱，实际上**就 5 类角色**——理解了角色分工，搭 AI workflow 就像搭积木。
+
+## 5 类角色
+
+<TerminalCell filename="langchain-roles.txt" runTag="🎭">
+{`① Chat Model (聊天模型)              "大脑" - 实际的 LLM
+   OpenAI Chat Model · Anthropic Chat Model · Ollama · Google Gemini · etc.
+
+② Agent (智能体)                     "决策中枢" - 协调 LLM 调用工具
+   AI Agent · Tools Agent · Conversational Agent
+
+③ Memory (记忆)                      "短期记忆" - 多轮对话上下文
+   Window Buffer Memory · Summary Buffer Memory · Postgres Chat Memory · etc.
+
+④ Tool (工具)                        "手脚" - Agent 可调用的能力
+   HTTP Request Tool · Code Tool · Calculator · Wikipedia · Custom Tool · etc.
+
+⑤ Vector Store (向量库)              "长期记忆" - 用于 RAG 检索
+   Pinecone · Qdrant · Supabase · Postgres · In-Memory · etc.
+
+辅助：
+  - Embeddings (嵌入模型)：把文本变向量，喂给 Vector Store
+  - Text Splitter：把长文档切成块
+  - Document Loader：从 PDF/URL 读文档`}
+</TerminalCell>
+
+## 节点连接模式（Root + Sub）
+
+LangChain 节点跟普通节点**连接方式不同**。它们用"**主节点 + 子节点挂载**"的模式：
+
+<TerminalCell filename="root-sub.txt" runTag="🔗">
+{`         ┌─────────────────────┐
+in    ─▶│   AI Agent          │─▶ out
+        │   (Root Node)       │
+        │                     │
+        │  Chat Model ◀──── [OpenAI Chat Model]    (Sub Node)
+        │  Memory     ◀──── [Window Buffer]        (Sub Node)
+        │  Tool       ◀──── [HTTP Request Tool]    (Sub Node)
+        │  Tool       ◀──── [Wikipedia Tool]       (Sub Node)
+        └─────────────────────┘
+
+主节点（Root）：AI Agent —— 处理输入输出
+子节点（Sub）：通过底部挂载口连接到主节点 —— 提供能力`}
+</TerminalCell>
+
+每个挂载口接受特定类型的子节点（Chat Model 口只能接 Chat Model 类）。
+
+## ① Chat Model：选哪个 LLM
+
+| 节点 | 模型来源 | 典型用法 |
+|---|---|---|
+| **OpenAI Chat Model** | OpenAI API (GPT-4o / GPT-4.1 / o-series) | 综合最强、贵 |
+| **Anthropic Chat Model** | Claude API (Sonnet / Opus / Haiku) | 长上下文 + 写作好 |
+| **Google Gemini Chat Model** | Gemini API | 性价比、多模态 |
+| **Ollama Chat Model** | 本地 Ollama | 零成本、隐私敏感数据 |
+| **Groq Chat Model** | Groq Cloud | 极快推理 |
+| **Mistral / DeepSeek / etc.** | 各家 API | 看具体需求 |
+
+<TerminalCell filename="chat-model-config.txt" runTag="⚙">
+{`OpenAI Chat Model:
+  Model:        gpt-4o-mini   (便宜) / gpt-4.1 (能力)
+  Temperature:  0.7           (创意度，0=确定，1=发散)
+  Max Tokens:   2000          (输出上限)
+  Credential:   <OpenAI API key>`}
+</TerminalCell>
+
+## ② Agent：选哪个智能体
+
+| Agent 节点 | 适合 |
+|---|---|
+| **AI Agent**（推荐默认） | 通用——LLM 自主决定调哪个工具 |
+| **Tools Agent** | 强工具调用场景 |
+| **Conversational Agent** | 多轮对话为主 |
+
+90% 的场景用 **AI Agent** 就够。
+
+## ③ Memory：要不要记得上次说啥
+
+| Memory 节点 | 何时用 |
+|---|---|
+| **Window Buffer Memory** | 保留**最近 N 轮**对话（最简单） |
+| **Summary Buffer Memory** | 保留摘要 + 最近几轮（长对话省 token） |
+| **Postgres Chat Memory** | 跨会话持久化（用户回来 7 天后还能续上） |
+| **Redis Chat Memory** | 同上但用 Redis |
+| 不挂 Memory | 每次都是新对话（适合"一问一答"场景） |
+
+## ④ Tool：给 Agent 装上"手脚"
+
+工具节点让 Agent 能**做事**——查 API、算数、读 Wikipedia、调你自定义的 workflow……
+
+<TerminalCell filename="tool-types.txt" runTag="🛠">
+{`内置工具：
+  - HTTP Request Tool       任意 API 调用
+  - Code Tool               JS 代码执行
+  - Calculator              数学运算
+  - Wikipedia               维基百科查询
+  - SerpAPI                 Google 搜索
+  - Vector Store Tool       检索你的知识库（RAG）
+
+把现有 workflow 当工具：
+  - Workflow Tool           调用另一个 n8n workflow
+
+把应用节点当工具（最强大）：
+  - Slack 节点、Notion 节点... 几乎所有应用节点都能挂到 Agent 上当 Tool`}
+</TerminalCell>
+
+每个工具挂载时要**给它起个名字 + 写"什么时候用它"**——LLM 看这段描述决定是否调用。
+
+## ⑤ Vector Store：长期记忆 / RAG
+
+把文档（PDF、网页、Notion 页）变成"可搜索的知识库"，喂给 Agent 当背景。详细见 5.4 节。
+
+<TerminalCell filename="vector-flow.txt" runTag="📚">
+{`流程：
+  PDF/文档 → [Document Loader] → [Text Splitter] → [Embeddings] → [Vector Store]
+                                                       (变向量)
+  用户问题 ─→ [Embeddings] → [Vector Store 搜索 top-K]
+                                       ↓
+                                       相关片段
+                                       ↓
+                                   AI Agent（带这些片段作为上下文回答）`}
+</TerminalCell>
+
+## 一个最小 Agent 的连线图
+
+<TerminalCell filename="minimal-agent-canvas.txt" runTag="🎯">
+{`[Chat Trigger]
+     ↓
+[AI Agent]
+     ├── Chat Model:  [OpenAI Chat Model]
+     ├── Memory:      [Window Buffer Memory]
+     └── Tool:        [Wikipedia Tool]
+     ↓
+[Respond to Chat]
+
+只有 5 个节点。Chat Trigger 接住用户消息，AI Agent 用 OpenAI 推理、记得最近对话、能查 Wikipedia，最后回复用户。`}
+</TerminalCell>
+
+<TipCallout type="warn" title="新手建议 · 先从 OpenAI 起步">
+  
+  虽然 Ollama 免费、隐私好，但本地模型对硬件有要求，调试慢。**新手起手用 OpenAI 的 gpt-4o-mini**（极便宜、能力够、稳定快）。学会了再切其他模型——切换只是改一个节点。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  打开 n8n，分别拖一个 AI Agent、一个 OpenAI Chat Model、一个 Window Buffer Memory、一个 HTTP Request Tool 到画布上。**不连接**，观察它们各自的形状和挂载口。看看 AI Agent 的下方有哪些挂载口、每个口的小标签写什么。
+  
+</TipCallout>
+
+## 本节要点回顾
+
+- LangChain 节点 5 类：Chat Model / Agent / Memory / Tool / Vector Store
+- 主节点（Root）+ 子节点（Sub）通过底部挂载口连接
+- Chat Model 选 OpenAI 起步最稳；Ollama 留给隐私和成本敏感场景
+- Agent 默认用 "AI Agent" 节点
+- Memory 让 Agent 记得多轮对话
+- Tool 让 Agent 能做事
+- Vector Store 用于 RAG（5.4 节展开）
+
+下一节深入[AI Agent 节点的工作机制](../ai-agent/)。
