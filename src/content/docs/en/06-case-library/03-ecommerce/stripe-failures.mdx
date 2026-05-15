@@ -1,0 +1,103 @@
+---
+title: Stripe Failed Payments · Real-Time Alerts
+description: payment_failed event → IF by amount → Slack alerts (high-value to critical channel) + Airtable logging
+sidebar:
+  order: 2
+  label: Case 3.2 · Stripe Failures
+difficulty: easy
+theme: ecommerce
+nodes:
+  - Stripe Trigger
+  - IF
+  - Slack
+  - Airtable
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/stripe-failures.json';
+
+<span class="editorial-label">Part 6 · Case 3.2 · 🛒 E-commerce</span>
+
+> **Difficulty** 🟢 Easy · **Time** ~15 min · **Core nodes** Stripe Trigger × IF × Slack
+
+Payment failure = potential lifetime customer loss. Knowing immediately and handling by severity is table stakes. This workflow listens for Stripe `payment_failed`, routes >$50 to #payments-critical (immediate human follow-up), others to #payments, all logged to Airtable for analysis.
+
+## 🎯 Scenario
+
+- SaaS / e-commerce — losing one order can mean lifetime customer loss
+- Finance needs monthly failure-reason stats
+- High-value orders need proactive recovery outreach
+
+## 🔍 Workflow
+
+<TerminalCell filename="stripe-failures.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 Key nodes
+
+### Stripe Trigger
+
+<TerminalCell filename="stripe-trigger.txt" runTag="⚙">
+{`Events:  [payment_intent.payment_failed]
+Credentials: Stripe Secret Key
+
+n8n auto-registers a webhook endpoint in Stripe.`}
+</TerminalCell>
+
+### IF amount > $50
+
+<TerminalCell filename="if-amount.txt" runTag="⚙">
+{`Conditions:
+  Value 1: ={{ $json.data.object.amount }}    ← Stripe uses cents
+  Operator: >
+  Value 2: 5000                                  ← = $50.00`}
+</TerminalCell>
+
+### Slack Critical (high-value)
+
+<TerminalCell filename="slack-critical.txt" runTag="⚙">
+{`Channel:  #payments-critical
+Text:
+  🚨 HIGH-VALUE payment failed
+  Customer: {{ $json.data.object.customer }}
+  Amount: \${{ $json.data.object.amount / 100 }}
+  Reason: {{ $json.data.object.last_payment_error.message }}`}
+</TerminalCell>
+
+### Log to Airtable
+
+Both branches (critical / normal) converge into Airtable for analysis:
+
+<TerminalCell filename="airtable-log.txt" runTag="⚙">
+{`Operation: Create Record
+Table:     failed_payments
+Fields:
+  customer_id:  ={{ $json.data.object.customer }}
+  amount:       ={{ $json.data.object.amount / 100 }}
+  reason:       ={{ $json.data.object.last_payment_error.message }}
+  failed_at:    ={{ $now.toISO() }}`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="stripe-failures.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Stripe amounts are in cents">
+  
+  All Stripe API amounts are in the **smallest currency unit** (USD = cents, JPY = yen). `$1.00` = `100` in the API. Always convert (divide by 100) for display.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - AI-analyze failure reason → suggest customer-service script (expired card vs insufficient funds need different responses)
+  - Wait + retry: Charge Retry 1 hour later
+  - Dashboard: monthly failure-rate chart from the Airtable data
+  
+</TipCallout>

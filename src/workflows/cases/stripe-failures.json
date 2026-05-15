@@ -1,0 +1,79 @@
+{
+  "name": "Stripe Failed Payments Alert",
+  "nodes": [
+    {
+      "parameters": { "events": ["payment_intent.payment_failed"] },
+      "id": "node-stripe-trigger",
+      "name": "Stripe Trigger",
+      "type": "n8n-nodes-base.stripeTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            { "leftValue": "={{ $json.data.object.amount }}", "rightValue": 5000, "operator": { "type": "number", "operation": "gt" } }
+          ]
+        }
+      },
+      "id": "node-if",
+      "name": "IF amount > $50",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#payments-critical",
+        "text": "=🚨 HIGH-VALUE payment failed\\nCustomer: {{ $json.data.object.customer }}\\nAmount: ${{ $json.data.object.amount / 100 }}\\nReason: {{ $json.data.object.last_payment_error.message }}"
+      },
+      "id": "node-slack-high",
+      "name": "Slack Critical",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [720, 200]
+    },
+    {
+      "parameters": {
+        "channel": "#payments",
+        "text": "=⚠ Payment failed · ${{ $json.data.object.amount / 100 }} · {{ $json.data.object.customer }}"
+      },
+      "id": "node-slack-low",
+      "name": "Slack Normal",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [720, 400]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "failed_payments",
+        "fields": {
+          "values": {
+            "customer_id": "={{ $json.data.object.customer }}",
+            "amount": "={{ $json.data.object.amount / 100 }}",
+            "reason": "={{ $json.data.object.last_payment_error.message }}",
+            "failed_at": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "id": "node-airtable",
+      "name": "Log to Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Stripe Trigger": { "main": [[{ "node": "IF amount > $50", "type": "main", "index": 0 }]] },
+    "IF amount > $50": {
+      "main": [
+        [{ "node": "Slack Critical", "type": "main", "index": 0 }],
+        [{ "node": "Slack Normal", "type": "main", "index": 0 }]
+      ]
+    },
+    "Slack Critical": { "main": [[{ "node": "Log to Airtable", "type": "main", "index": 0 }]] },
+    "Slack Normal": { "main": [[{ "node": "Log to Airtable", "type": "main", "index": 0 }]] }
+  }
+}

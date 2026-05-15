@@ -1,0 +1,103 @@
+---
+title: Stripe 支付失败实时告警
+description: 支付失败事件 → IF 按金额分流 → Slack 通知（高价进 critical 频道）+ Airtable 落库
+sidebar:
+  order: 2
+  label: 案例 3.2 · Stripe 失败告警
+difficulty: easy
+theme: ecommerce
+nodes:
+  - Stripe Trigger
+  - IF
+  - Slack
+  - Airtable
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/stripe-failures.json';
+
+<span class="editorial-label">第 6 部分 · 案例 3.2 · 🛒 电商 SaaS</span>
+
+> **难度** 🟢 简单 · **耗时** ~15 分钟 · **核心节点** Stripe Trigger × IF × Slack
+
+支付失败 = 失去客户。让团队第一时间知道、并按金额分级处理是基本功。这个 workflow 监听 Stripe payment_failed 事件，>$50 进 #payments-critical 频道（需要立刻人工跟进），其他进 #payments，统一落库到 Airtable 做后续分析。
+
+## 🎯 场景
+
+- SaaS / 电商：丢一单可能丢一个客户终身价值
+- 财务团队需要月度失败原因统计
+- 高价单需要客服主动联系挽回
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="stripe-failures.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={340} />
+</TerminalCell>
+
+## 📋 关键节点
+
+### Stripe Trigger
+
+<TerminalCell filename="stripe-trigger.txt" runTag="⚙">
+{`Events:  [payment_intent.payment_failed]
+Credentials: Stripe Secret Key
+
+n8n 自动在 Stripe 注册 webhook endpoint。`}
+</TerminalCell>
+
+### IF amount > $50
+
+<TerminalCell filename="if-amount.txt" runTag="⚙">
+{`Conditions:
+  Value 1: ={{ $json.data.object.amount }}    ← Stripe 用 cents
+  Operator: >
+  Value 2: 5000                                  ← 即 $50.00`}
+</TerminalCell>
+
+### Slack Critical（高价）
+
+<TerminalCell filename="slack-critical.txt" runTag="⚙">
+{`Channel:  #payments-critical
+Text:
+  🚨 HIGH-VALUE payment failed
+  Customer: {{ $json.data.object.customer }}
+  Amount: \${{ $json.data.object.amount / 100 }}
+  Reason: {{ $json.data.object.last_payment_error.message }}`}
+</TerminalCell>
+
+### Log to Airtable
+
+两条分支（critical / normal）都汇到 Airtable 表里做后续分析：
+
+<TerminalCell filename="airtable-log.txt" runTag="⚙">
+{`Operation: Create Record
+Table:     failed_payments
+Fields:
+  customer_id:  ={{ $json.data.object.customer }}
+  amount:       ={{ $json.data.object.amount / 100 }}
+  reason:       ={{ $json.data.object.last_payment_error.message }}
+  failed_at:    ={{ $now.toISO() }}`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="stripe-failures.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · Stripe 金额单位是 cents">
+  
+  Stripe API 所有金额都是**最小货币单位**（USD = cents, JPY = yen）。`$1.00` 在 API 里是 `100`。比较时记得换算或乘以 100。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 加 AI 节点分析失败原因 → 给客服推荐合适话术（卡过期 vs 余额不足回复不一样）
+  - 加 Wait + 重试：失败 1 小时后自动尝试 Charge Retry
+  - 看板：用 Airtable 数据做月度失败率图表
+  
+</TipCallout>

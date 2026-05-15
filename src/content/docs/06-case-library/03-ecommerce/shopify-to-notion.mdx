@@ -1,0 +1,92 @@
+---
+title: Shopify 订单 → Notion + Slack
+description: 新订单触发 → 整理数据 → 创建 Notion 页面 → Slack #orders 通知
+sidebar:
+  order: 1
+  label: 案例 3.1 · Shopify → Notion
+difficulty: easy
+theme: ecommerce
+nodes:
+  - Shopify Trigger
+  - Set
+  - Notion
+  - Slack
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/shopify-to-notion.json';
+
+<span class="editorial-label">第 6 部分 · 案例 3.1 · 🛒 电商 SaaS</span>
+
+> **难度** 🟢 简单 · **耗时** ~15 分钟 · **核心节点** Shopify Trigger × Notion × Slack
+
+小型电商团队的入门标配：每来一个 Shopify 订单，自动在 Notion 数据库里建一条记录（用于发货跟踪、客服处理），同时在 Slack #orders 频道发通知让团队第一时间知道。
+
+## 🎯 场景
+
+- 新店：还没复杂 ERP，用 Notion 做订单跟踪表
+- 团队协作：每来新单 Slack 立刻通知，避免漏单
+- 数据备份：除了 Shopify 后台，再有一份独立 Notion 表
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="shopify-to-notion.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 关键节点
+
+### Shopify Trigger
+
+<TerminalCell filename="shopify-trigger.txt" runTag="⚙">
+{`Events:  [orders/create]
+Credentials: Shopify Access Token
+
+n8n 会自动在你 Shopify 后台注册一个 webhook。`}
+</TerminalCell>
+
+### Reshape Order (Set 节点)
+
+Shopify webhook 数据很冗长，用 Set 抽出关键字段：
+
+<TerminalCell filename="reshape.txt" runTag="⚙">
+{`order_id:        ={{ $json.id }}
+customer_email:  ={{ $json.email }}
+total:           ={{ Number($json.total_price) }}     ← 字符串转数字
+items_summary:   ={{ $json.line_items.map(i => i.quantity + 'x ' + i.name).join(', ') }}`}
+</TerminalCell>
+
+### Create Notion Page
+
+<TerminalCell filename="notion-create.txt" runTag="⚙">
+{`Database:  <你的 Notion Orders DB>
+Properties:
+  Order (title):        =#{{ $json.order_id }}
+  Email (email):        ={{ $json.customer_email }}
+  Total (number):       ={{ $json.total }}
+  Items (text):         ={{ $json.items_summary }}
+  Status (select):      Pending`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="shopify-to-notion.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · Notion 字段类型不对">
+  
+  Notion Property 类型很多（title / rich_text / number / select / email / phone / date / ...），节点参数里**类型必须跟 Notion 数据库里的字段定义一致**——错了 Notion 拒收。先去 Notion 把 schema 定好。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 高价订单（>$500）加 IF + 发钉钉/微信通知老板
+  - 同步发货状态：Notion Status 改为 "Shipped" → 回写 Shopify
+  - 用 AI 节点分析 customer_note 字段，自动打"需特殊处理"标签
+  
+</TipCallout>

@@ -1,0 +1,103 @@
+---
+title: SaaS Trial Expiry Reminders
+description: Daily 9am scan for "expires in 3 days" trial users → send recovery email → mark notified
+sidebar:
+  order: 3
+  label: Case 3.3 · Trial Expiry
+difficulty: easy
+theme: ecommerce
+nodes:
+  - Schedule Trigger
+  - Postgres
+  - Email Send
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/trial-expiry.json';
+
+<span class="editorial-label">Part 6 · Case 3.3 · 🛒 E-commerce</span>
+
+> **Difficulty** 🟢 Easy · **Time** ~20 min · **Core nodes** Schedule × Postgres × Email
+
+The SaaS lifeline: convert trial users to paid. A "3 days remaining" email recovers a meaningful slice. This workflow scans the DB daily 9am, emails users whose trial ends in exactly 3 days and haven't been notified, then marks `notified_3d = true` to avoid repeats.
+
+## 🎯 Scenario
+
+- SaaS trial→paid conversion optimization
+- Monthly subscription renewal reminders
+- Generic "date-triggered batch notification" pattern
+
+## 🔍 Workflow
+
+<TerminalCell filename="trial-expiry.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={300} />
+</TerminalCell>
+
+## 📋 Key nodes
+
+### Daily 9AM Schedule
+
+<TerminalCell filename="schedule.txt" runTag="⚙">
+{`Mode:    Custom Cron Expression
+Cron:    0 9 * * *
+Note timezone settings`}
+</TerminalCell>
+
+### Find Trials Ending 3d (SQL)
+
+<TerminalCell filename="pg-find.txt" runTag="⚙">
+{`Operation:  Execute Query
+Query:
+  SELECT id, email, name, trial_ends_at
+  FROM users
+  WHERE trial_ends_at::date = (CURRENT_DATE + INTERVAL '3 days')::date
+    AND notified_3d = false
+
+Output: one item per row, downstream iterates`}
+</TerminalCell>
+
+### Send Reminder Email
+
+<TerminalCell filename="send-reminder.txt" runTag="⚙">
+{`To:       ={{ $json.email }}
+Subject:  =Your trial ends in 3 days, {{ $json.name }}
+HTML:
+  <p>Hi {{ $json.name }},</p>
+  <p>Your free trial expires on
+    <b>{{ DateTime.fromISO($json.trial_ends_at).toFormat('MMM d, yyyy') }}</b>.
+    Upgrade now for 20% off:</p>
+  <p><a href="https://example.com/upgrade?u={{ $json.id }}">Upgrade Now</a></p>`}
+</TerminalCell>
+
+### Mark Notified (prevent duplicates)
+
+<TerminalCell filename="pg-update.txt" runTag="⚙">
+{`Operation: Execute Query
+Query:     UPDATE users SET notified_3d = true
+           WHERE id = {{ $('Find Trials Ending 3d').item.json.id }}
+
+⚠ Always add this step — without it, tomorrow's run re-sends`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="trial-expiry.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · SQL injection risk">
+  
+  The UPDATE concatenates `$json.id` directly. If id comes from untrusted input, that's an injection vector. Here it's a Postgres primary key (integer) so it's relatively safe. **In production, use parameterized queries** (Postgres node Operation = "Insert/Update" with structured fields).
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - Tiered reminders: 7d / 3d / 1d with different copy
+  - AI-personalize: generate custom email based on user behavior
+  - Track: add UTM params to the link, see who clicks
+  
+</TipCallout>

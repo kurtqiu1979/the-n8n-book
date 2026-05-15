@@ -1,0 +1,67 @@
+{
+  "name": "Shopify Orders to Notion",
+  "nodes": [
+    {
+      "parameters": { "events": ["orders/create"] },
+      "id": "node-shopify-trigger",
+      "name": "Shopify Trigger",
+      "type": "n8n-nodes-base.shopifyTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "1", "name": "order_id", "value": "={{ $json.id }}", "type": "string" },
+            { "id": "2", "name": "customer_email", "value": "={{ $json.email }}", "type": "string" },
+            { "id": "3", "name": "total", "value": "={{ Number($json.total_price) }}", "type": "number" },
+            { "id": "4", "name": "items_summary", "value": "={{ $json.line_items.map(i => `${i.quantity}x ${i.name}`).join(', ') }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set",
+      "name": "Reshape Order",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": "<NOTION_ORDERS_DB>",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Order|title", "title": "={{ '#' + $json.order_id }}" },
+            { "key": "Email|email", "emailValue": "={{ $json.customer_email }}" },
+            { "key": "Total|number", "numberValue": "={{ $json.total }}" },
+            { "key": "Items|rich_text", "textContent": "={{ $json.items_summary }}" },
+            { "key": "Status|select", "selectValue": "Pending" }
+          ]
+        }
+      },
+      "id": "node-notion",
+      "name": "Create Notion Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#orders",
+        "text": "=🛒 New order #{{ $json.order_id }} · ${{ $json.total }} · {{ $json.customer_email }}"
+      },
+      "id": "node-slack",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Shopify Trigger": { "main": [[{ "node": "Reshape Order", "type": "main", "index": 0 }]] },
+    "Reshape Order": { "main": [[{ "node": "Create Notion Page", "type": "main", "index": 0 }]] },
+    "Create Notion Page": { "main": [[{ "node": "Notify Slack", "type": "main", "index": 0 }]] }
+  }
+}

@@ -1,0 +1,103 @@
+---
+title: SaaS 试用到期提醒
+description: 每天 9 点扫"3 天后到期"的 trial 用户 → 发邮件挽留 → 标记已通知
+sidebar:
+  order: 3
+  label: 案例 3.3 · 试用到期提醒
+difficulty: easy
+theme: ecommerce
+nodes:
+  - Schedule Trigger
+  - Postgres
+  - Email Send
+---
+
+import TerminalCell from '../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../workflows/cases/trial-expiry.json';
+
+<span class="editorial-label">第 6 部分 · 案例 3.3 · 🛒 电商 SaaS</span>
+
+> **难度** 🟢 简单 · **耗时** ~20 分钟 · **核心节点** Schedule × Postgres × Email
+
+SaaS 的命脉：让 trial 用户转付费用户。3 天前来一封"还有 3 天到期"的邮件能挽回不少。这个 workflow 每天上午 9 点扫数据库，给"恰好 3 天后到期且还没通知过"的用户发邮件，发完标记 `notified_3d = true` 避免重复。
+
+## 🎯 场景
+
+- SaaS 产品 trial→paid 转化优化
+- 月卡到期前的续费提醒
+- 通用"按日期触发的批量通知"模式
+
+## 🔍 工作流连线图
+
+<TerminalCell filename="trial-expiry.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={300} />
+</TerminalCell>
+
+## 📋 关键节点
+
+### Daily 9AM Schedule
+
+<TerminalCell filename="schedule.txt" runTag="⚙">
+{`Mode:    Custom Cron Expression
+Cron:    0 9 * * *
+注意时区设置`}
+</TerminalCell>
+
+### Find Trials Ending 3d（SQL）
+
+<TerminalCell filename="pg-find.txt" runTag="⚙">
+{`Operation:  Execute Query
+Query:
+  SELECT id, email, name, trial_ends_at
+  FROM users
+  WHERE trial_ends_at::date = (CURRENT_DATE + INTERVAL '3 days')::date
+    AND notified_3d = false
+
+输出：每行一个 item，下游迭代处理`}
+</TerminalCell>
+
+### Send Reminder Email
+
+<TerminalCell filename="send-reminder.txt" runTag="⚙">
+{`To:       ={{ $json.email }}
+Subject:  =Your trial ends in 3 days, {{ $json.name }}
+HTML:
+  <p>Hi {{ $json.name }},</p>
+  <p>Your free trial expires on
+    <b>{{ DateTime.fromISO($json.trial_ends_at).toFormat('MMM d, yyyy') }}</b>.
+    Upgrade now for 20% off:</p>
+  <p><a href="https://example.com/upgrade?u={{ $json.id }}">Upgrade Now</a></p>`}
+</TerminalCell>
+
+### Mark Notified（避免重复）
+
+<TerminalCell filename="pg-update.txt" runTag="⚙">
+{`Operation: Execute Query
+Query:     UPDATE users SET notified_3d = true
+           WHERE id = {{ $('Find Trials Ending 3d').item.json.id }}
+
+⚠ 务必加这一步，否则明天还会发`}
+</TerminalCell>
+
+## 📥 一键复制 Workflow JSON
+
+<TerminalCell filename="trial-expiry.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="坑 · SQL 注入风险">
+  
+  Mark Notified 那条 UPDATE 里直接拼了 `$json.id`。如果 id 来源不可信（用户输入等），有 SQL 注入风险。这里 id 是 Postgres 主键（数字），相对安全。生产环境建议**用参数化查询**（Postgres 节点 Operation = "Insert" 走结构化字段）。
+  
+</TipCallout>
+
+<TipCallout type="quest" title="扩展挑战">
+  
+  - 分级提醒：7 天 / 3 天 / 1 天三档不同文案
+  - AI 个性化邮件：根据用户使用数据生成定制挽留文案
+  - 加追踪：邮件链接里加 UTM，看哪些用户点了
+  
+</TipCallout>

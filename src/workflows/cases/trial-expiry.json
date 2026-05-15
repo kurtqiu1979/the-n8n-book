@@ -1,0 +1,55 @@
+{
+  "name": "SaaS Trial Expiry Reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] }
+      },
+      "id": "node-schedule",
+      "name": "Daily 9AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, email, name, trial_ends_at FROM users WHERE trial_ends_at::date = (CURRENT_DATE + INTERVAL '3 days')::date AND notified_3d = false"
+      },
+      "id": "node-pg",
+      "name": "Find Trials Ending 3d",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "hello@example.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=Your trial ends in 3 days, {{ $json.name }}",
+        "html": "=<p>Hi {{ $json.name }},</p><p>Your free trial expires on <b>{{ DateTime.fromISO($json.trial_ends_at).toFormat('MMM d, yyyy') }}</b>. Upgrade now for 20% off:</p><p><a href=\"https://example.com/upgrade?u={{ $json.id }}\">Upgrade Now</a></p>"
+      },
+      "id": "node-email",
+      "name": "Send Reminder Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE users SET notified_3d = true WHERE id = {{ $('Find Trials Ending 3d').item.json.id }}"
+      },
+      "id": "node-pg-update",
+      "name": "Mark Notified",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [920, 300]
+    }
+  ],
+  "connections": {
+    "Daily 9AM": { "main": [[{ "node": "Find Trials Ending 3d", "type": "main", "index": 0 }]] },
+    "Find Trials Ending 3d": { "main": [[{ "node": "Send Reminder Email", "type": "main", "index": 0 }]] },
+    "Send Reminder Email": { "main": [[{ "node": "Mark Notified", "type": "main", "index": 0 }]] }
+  }
+}

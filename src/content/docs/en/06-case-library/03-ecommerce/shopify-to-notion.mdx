@@ -1,0 +1,92 @@
+---
+title: Shopify Orders → Notion + Slack
+description: New order triggers → reshape data → create Notion page → notify Slack #orders
+sidebar:
+  order: 1
+  label: Case 3.1 · Shopify → Notion
+difficulty: easy
+theme: ecommerce
+nodes:
+  - Shopify Trigger
+  - Set
+  - Notion
+  - Slack
+---
+
+import TerminalCell from '../../../../../components/TerminalCell.astro';
+import TipCallout from '../../../../../components/TipCallout.astro';
+import CopyJsonButton from '../../../../../components/CopyJsonButton.tsx';
+import WorkflowViewer from '../../../../../components/WorkflowViewer.tsx';
+import workflow from '../../../../../workflows/cases/shopify-to-notion.json';
+
+<span class="editorial-label">Part 6 · Case 3.1 · 🛒 E-commerce</span>
+
+> **Difficulty** 🟢 Easy · **Time** ~15 min · **Core nodes** Shopify Trigger × Notion × Slack
+
+The classic small-team setup: each new Shopify order auto-creates a Notion DB row (for fulfillment tracking, customer service), and Slack pings the team in real-time so nothing slips.
+
+## 🎯 Scenario
+
+- Small store: no full ERP yet, Notion as order tracker
+- Team coordination: Slack ping on every order, never miss one
+- Data backup: independent copy outside Shopify
+
+## 🔍 Workflow
+
+<TerminalCell filename="shopify-to-notion.workflow.json" level="Lv.1" runTag="▦ workflow">
+<WorkflowViewer client:load workflow={workflow} height={320} />
+</TerminalCell>
+
+## 📋 Key nodes
+
+### Shopify Trigger
+
+<TerminalCell filename="shopify-trigger.txt" runTag="⚙">
+{`Events:  [orders/create]
+Credentials: Shopify Access Token
+
+n8n auto-registers a webhook in your Shopify admin.`}
+</TerminalCell>
+
+### Reshape Order (Set)
+
+Shopify's webhook payload is verbose — use Set to pull out essentials:
+
+<TerminalCell filename="reshape.txt" runTag="⚙">
+{`order_id:        ={{ $json.id }}
+customer_email:  ={{ $json.email }}
+total:           ={{ Number($json.total_price) }}     ← string → number
+items_summary:   ={{ $json.line_items.map(i => i.quantity + 'x ' + i.name).join(', ') }}`}
+</TerminalCell>
+
+### Create Notion Page
+
+<TerminalCell filename="notion-create.txt" runTag="⚙">
+{`Database:  <your Notion Orders DB>
+Properties:
+  Order (title):        =#{{ $json.order_id }}
+  Email (email):        ={{ $json.customer_email }}
+  Total (number):       ={{ $json.total }}
+  Items (text):         ={{ $json.items_summary }}
+  Status (select):      Pending`}
+</TerminalCell>
+
+## 📥 Copy Workflow JSON
+
+<TerminalCell filename="shopify-to-notion.workflow.json" runTag="📋">
+<CopyJsonButton client:load data={workflow} />
+</TerminalCell>
+
+<TipCallout type="warn" title="Trap · Notion field types must match">
+  
+  Notion property types (title / rich_text / number / select / email / phone / date / ...) **must match** the node parameter types. Mismatches get rejected. Set up the Notion DB schema first.
+  
+</TipCallout>
+
+<TipCallout type="quest" title="Extensions">
+  
+  - High-value orders (>$500): IF + ping the boss on Slack
+  - Sync shipping status: Notion Status → "Shipped" writes back to Shopify
+  - AI-analyze customer notes; auto-tag "needs special handling"
+  
+</TipCallout>
